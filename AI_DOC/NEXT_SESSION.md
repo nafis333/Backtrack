@@ -1,8 +1,0 @@
-PHASE: Phase 4 COMPLETE. Phase 5 NOT STARTED (unblocked). P5-PREREQ-1 DELIVERED.
-CURRENT TASK: Fix fixed_untp section — Open Rate/Net R/Expectancy/Avg MFE/MAE stat cards + Open/SL/BE counts + streaks + equity chart + drawdown + MFE-MAE summary cards. Same layout as original_tp panel. BE toggle (client-side, no server re-fetch) for untp_overview mode only.
-FIRST ACTION: Read MCP.md. Then open statistics.html output from last session — it is the base. The UNTP panel HTML and renderUntpStats() JS are already written. User wants to verify the fixed_untp logic is correct and may need visual/logic fixes based on live testing. Ask user what specifically looks wrong before touching code.
-BLOCKER: none
-PENDING PATCHES: Paste all three patches below (MCP.md, Phases_Backtest.md, checklist.md) before starting.
-TEST SUITE: 130/130 passing (test_14 needs updating to new mode names — see TEST-14-UPDATE gap below, not blocking app).
-LAST DECISION: UNTP panel uses Open/SL/BE buckets (no Win, no Inconclusive). BE toggle is client-side only — server pre-computes stats_all + stats_be_active + stats_no_be in one response. fixed_untp and untp_overview share the same panel and renderUntpStats() function.
-OPEN QUESTIONS: User says "need work for statistics again with fixed_tp untp section logic" — need to ask what specifically is wrong or missing after they test with the new files. Could be: (1) logic bug in bucket classification, (2) UI layout issue, (3) missing field, (4) something else. Do not guess — ask first.

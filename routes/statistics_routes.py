@@ -25,17 +25,21 @@ from typing import Optional
 from flask import Blueprint, render_template, request, jsonify
 
 from db import db, Trade
+from data_loader import data_frames
 from utils.trade_storage import get_all_channels
 from utils.trade_statistics import (
     compute_overview,
     compute_untp_stats,
     compute_fixed_untp_overview,
+    compute_fixed_untp_from_walks,
+    compute_untp_stats_from_walks,
     compute_hit_rate,
     compute_pnl_report,
     TIME_LIMIT_LABELS,
     VALID_TP_MODES,
     VALID_UNITS,
 )
+from utils.walk_engine import walk_trade_untp, WalkDataError, UNTP_CAP_MINUTES
 
 logger = logging.getLogger(__name__)
 
@@ -58,11 +62,10 @@ def statistics_hub():
     )
     symbols = [row[0] for row in symbol_rows]
 
-    # UNTP modes require a real checkpoint — exclude the "No limit" entry
+    # Phase 6+: "No limit" included — maps to 504h cap via walk_engine
     time_limit_options = [
         {'value': k, 'label': v}
         for k, v in TIME_LIMIT_LABELS.items()
-        if k is not None
     ]
 
     return render_template(
@@ -122,9 +125,10 @@ def statistics_overview():
         time_limit_hours = None
 
     if tp_mode in ('fixed_untp', 'untp_overview'):
-        if time_limit_hours is None or time_limit_hours <= 0:
+        # None = no limit = UNTP_CAP_MINUTES. Negative values are still invalid.
+        if time_limit_hours is not None and time_limit_hours <= 0:
             return jsonify({
-                'error': f"time_limit_hours is required for tp_mode={tp_mode}"
+                'error': f"time_limit_hours must be positive or null for tp_mode={tp_mode}"
             }), 400
 
     # ── Load trades ──────────────────────────────────────────
@@ -138,21 +142,51 @@ def statistics_overview():
 
     # ── Dispatch ─────────────────────────────────────────────
     try:
-        if tp_mode == 'untp_overview':
-            result = compute_untp_stats(
-                trade_dicts,
-                time_limit_hours=time_limit_hours,
-                tp_mode='untp_overview',
-                tp_value=None,
-                unit=unit,
+        if tp_mode in ('fixed_untp', 'untp_overview'):
+            # Phase 6: parquet re-walk — candle-level precision (DECISION-22)
+            be_trigger_r = _parse_float(data.get('be_trigger_r'))
+            max_minutes  = (
+                UNTP_CAP_MINUTES
+                if time_limit_hours is None
+                else min(int(time_limit_hours * 60), UNTP_CAP_MINUTES)
             )
-        elif tp_mode == 'fixed_untp':
-            result = compute_fixed_untp_overview(
-                trade_dicts,
-                tp_value=tp_value,
-                time_limit_hours=time_limit_hours,
-                unit=unit,
-            )
+            time_limit_label = TIME_LIMIT_LABELS.get(time_limit_hours, 'No limit')
+
+            price_excluded = [t for t in trade_dicts if not t.get('price_path_captured')]
+            walkable       = [t for t in trade_dicts if t.get('price_path_captured')]
+
+            pairs_be_on:  list = []
+            pairs_be_off: list = []
+            walk_excluded = 0
+
+            for td in walkable:
+                try:
+                    r_on  = walk_trade_untp(td, data_frames, max_minutes, True,  be_trigger_r)
+                    r_off = walk_trade_untp(td, data_frames, max_minutes, False, None)
+                    pairs_be_on.append((td, r_on))
+                    pairs_be_off.append((td, r_off))
+                except WalkDataError as exc:
+                    logger.debug("WalkDataError trade %s: %s", td.get('trade_id'), exc)
+                    walk_excluded += 1
+
+            if tp_mode == 'fixed_untp':
+                result = compute_fixed_untp_from_walks(
+                    pairs_be_on, pairs_be_off,
+                    tp_value=tp_value,
+                    unit=unit,
+                    total_trades=len(trade_dicts),
+                    excluded_count=len(price_excluded),
+                    walk_excluded_count=walk_excluded,
+                    time_limit_label=time_limit_label,
+                )
+            else:
+                result = compute_untp_stats_from_walks(
+                    pairs_be_on, pairs_be_off,
+                    total_trades=len(trade_dicts),
+                    excluded_count=len(price_excluded),
+                    walk_excluded_count=walk_excluded,
+                    time_limit_label=time_limit_label,
+                )
         else:
             result = compute_overview(trade_dicts, tp_mode, tp_value, None, unit)
     except Exception as exc:
