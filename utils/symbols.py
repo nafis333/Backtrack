@@ -1,0 +1,16 @@
+# symbols.py
+
+# 32 major forex pairs 
+MAJOR_PAIRS = [
+    "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD",
+    "EURGBP", "EURJPY", "GBPJPY", "EURCHF", "EURCAD", "AUDJPY", "AUDNZD",
+    "AUDCAD", "CADCHF", "CHFJPY", "EURNZD", "GBPAUD", "GBPCAD", "GBPNZD",
+    "USDNOK", "USDSGD", "USDSEK", "USDZAR", "NZDCAD", "GBPCHF", "USDTRY",
+    "CADJPY", "AUDCHF", "NZDCHF", "NZDJPY", "EURAUD"
+]
+
+# Additional instruments.
+EXTRA_INSTRUMENTS = ["XAUUSD", "XAGUSD", "NAS100", "US30", "USOIL", "UKOIL"]
+
+# Combined list.
+SYMBOLS = MAJOR_PAIRS + EXTRA_INSTRUMENTS

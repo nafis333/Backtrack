@@ -1,0 +1,30 @@
+# Python cache files - NEVER TRACK THESE
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.pyc
+
+# Sensitive information
+token.txt
+.env
+.env.*
+*.key
+*.pem
+*secret*
+*credential*
+config.local.py
+secrets.json
+auth.json
+*.token
+
+# IDE files (optional)
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

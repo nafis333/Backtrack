@@ -1,0 +1,2391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{{ channel.name }} — Backtest System</title>
+  <style>
+    :root {
+      --bg:       #0f1117;
+      --surface:  #1a1d27;
+      --surface2: #22263a;
+      --border:   #2e3348;
+      --accent:   #4A90D9;
+      --accent2:  #6ab0f5;
+      --text:     #e8eaf6;
+      --muted:    #8891b4;
+      --success:  #4caf7d;
+      --warn:     #f5a623;
+      --danger:   #e05c5c;
+      --radius:   10px;
+      --drawer-w: 420px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* ── NAV ── */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 52px;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+    }
+    .nav-brand { font-size: 16px; font-weight: 700; color: var(--accent2); text-decoration: none; margin-right: 16px; }
+    .nav-link { color: var(--muted); text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 13px; transition: background .15s, color .15s; }
+    .nav-link:hover, .nav-link.active { background: var(--surface2); color: var(--text); }
+    .nav-sep { color: var(--border); margin: 0 4px; }
+
+    /* ── LAYOUT ── */
+    .page { max-width: 1400px; margin: 0 auto; padding: 28px 24px; }
+
+    /* ── PAGE HEADER ── */
+    .page-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      margin-bottom: 20px; gap: 16px; flex-wrap: wrap;
+    }
+    .channel-name-row { display: flex; align-items: center; gap: 12px; }
+    .channel-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+    .page-title { font-size: 22px; font-weight: 700; }
+    .page-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: 7px; border: none;
+      cursor: pointer; font-size: 13px; font-weight: 600;
+      text-decoration: none; transition: opacity .15s, filter .15s;
+      font-family: inherit;
+    }
+    .btn:hover { filter: brightness(1.12); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--text); }
+    .btn-sm { padding: 5px 11px; font-size: 12px; }
+    .btn-icon { padding: 5px 8px; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger-outline { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+
+    /* ── TOGGLE PILL ── */
+    .toggle-pill {
+      display: inline-flex;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2px;
+    }
+    .toggle-pill button {
+      padding: 4px 14px;
+      border: none;
+      border-radius: 18px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+      font-family: inherit;
+    }
+    .toggle-pill button.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* ── BANNERS ── */
+    .warn-banner {
+      background: rgba(245,166,35,.1); border: 1px solid var(--warn);
+      border-radius: 8px; padding: 10px 16px; margin-bottom: 16px;
+      font-size: 13px; color: var(--warn);
+    }
+    .archived-banner {
+      background: rgba(160,160,160,.1); border: 1px solid #666;
+      border-radius: 8px; padding: 10px 16px; margin-bottom: 16px;
+      font-size: 13px; color: #aaa;
+    }
+    tr.row-bad-data { background: rgba(245,166,35,.05); }
+    tr.row-bad-data:hover { background: rgba(245,166,35,.1) !important; }
+    .badge-bad-data { font-size: 11px; color: var(--warn); cursor: help; }
+
+    /* ── PNL SUMMARY BAR ── */
+    .pnl-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 20px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      flex-wrap: wrap;
+    }
+    .pnl-bar-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 0 20px;
+      border-right: 1px solid var(--border);
+    }
+    .pnl-bar-item:first-child { padding-left: 0; }
+    .pnl-bar-item:last-child  { border-right: none; }
+    .pnl-bar-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--muted);
+    }
+    .pnl-bar-value {
+      font-size: 18px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .pnl-bar-value.pos  { color: var(--success); }
+    .pnl-bar-value.neg  { color: var(--danger); }
+    .pnl-bar-value.neu  { color: var(--muted); }
+    .pnl-bar-value.acc  { color: var(--accent2); }
+    .pnl-bar-excluded {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--muted);
+      padding-left: 20px;
+    }
+
+    /* ── FILTER BAR ── */
+    .filter-bar {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 18px; margin-bottom: 12px;
+      display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+    }
+    .filter-group { display: flex; flex-direction: column; gap: 4px; }
+    .filter-group label { font-size: 11px; color: var(--muted); }
+    select, input[type="date"] {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); padding: 6px 10px;
+      font-size: 12px; outline: none; font-family: inherit; cursor: pointer;
+    }
+    select:focus, input[type="date"]:focus { border-color: var(--accent); }
+    .filter-actions { display: flex; gap: 8px; align-items: flex-end; margin-left: auto; }
+
+    /* ── TABLE TOOLBAR ── */
+    .table-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      gap: 12px;
+    }
+    .table-toolbar-left { font-size: 12px; color: var(--muted); }
+
+    /* ── TABLE ── */
+    .table-wrap {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow-x: auto;
+    }
+    table { width: 100%; border-collapse: collapse; min-width: 960px; }
+    thead th {
+      background: var(--surface2); color: var(--muted); font-size: 11px;
+      font-weight: 600; text-transform: uppercase; letter-spacing: .5px;
+      padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .1s;
+      cursor: pointer;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    tbody tr.selected { background: rgba(74,144,217,.08) !important; }
+    td {
+      padding: 10px 14px; font-size: 13px;
+      vertical-align: middle; white-space: nowrap;
+    }
+    td.notes-cell { max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ── BADGES ── */
+    .badge {
+      display: inline-block; border-radius: 5px;
+      padding: 3px 9px; font-size: 11px; font-weight: 700;
+    }
+    .badge-tp  { background: rgba(76,175,125,.15); color: var(--success); border: 1px solid var(--success); }
+    .badge-sl  { background: rgba(224,92,92,.15);  color: var(--danger);  border: 1px solid var(--danger); }
+    .badge-be  { background: rgba(138,145,180,.15); color: var(--muted);  border: 1px solid var(--muted); }
+    .badge-open{ background: rgba(74,144,217,.15);  color: var(--accent2); border: 1px solid var(--accent); }
+    .badge-none{ background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+    .badge-run { background: rgba(106,176,245,.12); color: var(--accent2); border: 1px solid var(--accent); }
+
+    .pnl-pos { color: var(--success); font-weight: 700; }
+    .pnl-neg { color: var(--danger);  font-weight: 700; }
+    .pnl-zero{ color: var(--muted);   font-weight: 700; }
+
+    .type-tag {
+      font-size: 11px; padding: 2px 7px; border-radius: 4px;
+      background: var(--surface2); color: var(--accent2); border: 1px solid var(--border);
+    }
+
+    /* unit-switchable cells */
+    .unit-rr   { display: inline; }
+    .unit-pips { display: none; }
+    body.show-pips .unit-rr   { display: none; }
+    body.show-pips .unit-pips { display: inline; }
+
+    /* ── TABLE FOOTER ── */
+    .table-footer {
+      padding: 12px 18px; border-top: 1px solid var(--border);
+      font-size: 12px; color: var(--muted);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    /* ── EMPTY STATE ── */
+    .empty-row td { text-align: center; color: var(--muted); padding: 48px; }
+
+    /* ── ROW ACTIONS ── */
+    .row-actions { display: flex; gap: 6px; }
+    .row-actions button { position: relative; z-index: 1; }
+
+    /* ── TRADE ANALYSIS SECTION ── */
+    .analysis-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .analysis-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 10px 12px;
+    }
+    .analysis-card-wide {
+      grid-column: span 2;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 10px 12px;
+    }
+    .analysis-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+    .analysis-value { font-size: 16px; font-weight: 700; }
+    .analysis-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .fill-bar-wrap {
+      height: 5px; background: var(--border);
+      border-radius: 3px; overflow: hidden; margin-top: 6px;
+    }
+    .fill-bar { height: 100%; border-radius: 3px; transition: width .4s ease; }
+
+    .shape-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 13px; font-weight: 700; padding: 4px 12px;
+      border-radius: 6px; border: 1px solid;
+    }
+    .shape-clean        { color: var(--success); border-color: var(--success); background: rgba(76,175,125,.1); }
+    .shape-dip-run      { color: var(--warn);    border-color: var(--warn);    background: rgba(245,166,35,.1); }
+    .shape-choppy       { color: var(--muted);   border-color: var(--border);  background: var(--surface2); }
+    .shape-stopped-clean{ color: var(--danger);  border-color: var(--danger);  background: rgba(224,92,92,.1); }
+    .shape-desc { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+
+    /* ── TRADE DETAIL DRAWER ── */
+    .drawer-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.45); z-index: 300;
+    }
+    .drawer-overlay.open { display: block; }
+    .drawer {
+      position: fixed; top: 0; right: 0;
+      width: var(--drawer-w); height: 100vh;
+      background: var(--surface); border-left: 1px solid var(--border);
+      z-index: 301; display: flex; flex-direction: column;
+      transform: translateX(100%);
+      transition: transform .25s cubic-bezier(.4,0,.2,1);
+      overflow: hidden;
+    }
+    .drawer.open { transform: translateX(0); }
+    .drawer-head {
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: flex-start; gap: 12px; flex-shrink: 0;
+    }
+    .drawer-head-info { flex: 1; min-width: 0; }
+    .drawer-symbol { font-size: 20px; font-weight: 700; line-height: 1; }
+    .drawer-meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .drawer-close {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); border-radius: 6px; width: 30px; height: 30px;
+      cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      transition: color .15s, border-color .15s;
+    }
+    .drawer-close:hover { color: var(--text); border-color: var(--muted); }
+    .drawer-body { flex: 1; overflow-y: auto; padding: 0; }
+    .drawer-body::-webkit-scrollbar { width: 4px; }
+    .drawer-body::-webkit-scrollbar-track { background: transparent; }
+    .drawer-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .d-section { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+    .d-section:last-child { border-bottom: none; }
+    .d-section-title {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--muted); margin-bottom: 12px;
+    }
+    .d-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .d-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .d-item { display: flex; flex-direction: column; gap: 2px; }
+    .d-item-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .d-item-value { font-size: 14px; font-weight: 600; color: var(--text); }
+    .d-item-value.pos  { color: var(--success); }
+    .d-item-value.neg  { color: var(--danger); }
+    .d-item-value.warn { color: var(--warn); }
+    .d-item-value.acc  { color: var(--accent2); }
+    .d-item-value.dim  { color: var(--muted); font-weight: 400; }
+    .d-outcome-hero {
+      display: flex; align-items: center; gap: 16px;
+      background: var(--surface2); border-radius: 8px;
+      padding: 14px 16px; margin-bottom: 12px;
+    }
+    .d-outcome-icon { font-size: 28px; }
+    .d-outcome-label { font-size: 18px; font-weight: 700; }
+    .d-outcome-pnl { font-size: 28px; font-weight: 700; margin-left: auto; }
+    .d-outcome-pnl.pos  { color: var(--success); }
+    .d-outcome-pnl.neg  { color: var(--danger); }
+    .d-outcome-pnl.zero { color: var(--muted); }
+    .milestone-list { display: flex; flex-direction: column; gap: 6px; }
+    .milestone-item { display: flex; align-items: center; gap: 10px; }
+    .milestone-label { font-size: 11px; color: var(--muted); width: 36px; flex-shrink: 0; }
+    .milestone-bar-wrap { flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+    .milestone-bar { height: 100%; background: var(--accent); border-radius: 3px; transition: width .4s ease; }
+    .milestone-time { font-size: 11px; color: var(--text); width: 80px; text-align: right; flex-shrink: 0; }
+    .be-triggered-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 600; padding: 3px 9px;
+      border-radius: 5px; margin-bottom: 10px;
+    }
+    .be-triggered-badge.yes { background: rgba(76,175,125,.15); color: var(--success); border: 1px solid var(--success); }
+    .be-triggered-badge.no  { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+    .notes-edit-wrap { position: relative; }
+    .notes-textarea {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-family: inherit; font-size: 13px;
+      padding: 10px 12px; resize: vertical; min-height: 80px; outline: none;
+      transition: border-color .15s;
+    }
+    .notes-textarea:focus { border-color: var(--accent); }
+    .notes-save-btn {
+      margin-top: 8px; padding: 5px 14px; background: var(--accent);
+      color: #fff; border: none; border-radius: 6px; font-size: 12px;
+      font-weight: 600; cursor: pointer; font-family: inherit; transition: opacity .15s;
+    }
+    .notes-save-btn:hover { opacity: .85; }
+    .notes-save-status {
+      font-size: 11px; color: var(--success); margin-left: 8px;
+      opacity: 0; transition: opacity .3s;
+    }
+    .notes-save-status.visible { opacity: 1; }
+    .drawer-foot {
+      padding: 14px 20px; border-top: 1px solid var(--border);
+      display: flex; gap: 10px; flex-shrink: 0;
+    }
+
+    /* ── MODALS ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.7); z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; width: 100%; max-width: 400px;
+      padding: 24px; display: flex; flex-direction: column; gap: 16px;
+    }
+    .modal h3 { font-size: 16px; font-weight: 700; }
+    .modal p  { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; }
+    label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed; bottom: 24px; right: 24px;
+      z-index: 9999; display: flex; flex-direction: column; gap: 8px;
+    }
+    .toast-item {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 18px; font-size: 13px;
+      min-width: 260px; box-shadow: 0 4px 20px rgba(0,0,0,.4);
+      animation: slideIn .2s ease;
+    }
+    .toast-item.success { border-color: var(--success); }
+    .toast-item.error   { border-color: var(--danger); }
+    @keyframes slideIn { from { transform: translateX(40px); opacity: 0; } }
+
+    /* ── UNTP SECTION ── */
+    .untp-section-header {
+      display: flex; align-items: center; gap: 14px;
+      padding: 10px 0 12px; flex-wrap: wrap;
+    }
+    .untp-section-title {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--accent2);
+    }
+    .untp-window-controls {
+      display: flex; align-items: center; gap: 10px; flex: 1; min-width: 260px;
+    }
+    .untp-window-controls label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .untp-window-controls input[type="range"] {
+      flex: 1; accent-color: var(--accent); cursor: pointer; height: 4px;
+    }
+    .untp-window-box {
+      width: 72px; padding: 3px 7px; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 4px; color: var(--text);
+      font-size: 12px; font-family: monospace; outline: none;
+    }
+    .untp-window-box:focus { border-color: var(--accent); }
+    .untp-window-resolved {
+      font-size: 11px; color: var(--accent2); font-family: monospace;
+      white-space: nowrap; min-width: 60px;
+    }
+    .untp-table-container { margin-top: 0; }
+
+    @media (max-width: 640px) {
+      .page { padding: 16px; }
+      .filter-bar { flex-direction: column; }
+      .filter-actions { margin-left: 0; }
+      .drawer { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="nav-brand">📈 Backtest</a>
+  <a href="/" class="nav-link">Monitor</a>
+  <span class="nav-sep">›</span>
+  <a href="/channels" class="nav-link">Channels</a>
+  <span class="nav-sep">›</span>
+  <span class="nav-link active">{{ channel.name }}</span>
+</nav>
+
+<div class="page">
+
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <div>
+      <div class="channel-name-row">
+        <div class="channel-dot" data-color="{{ channel.color or '#4A90D9' }}"></div>
+        <h1 class="page-title">{{ channel.name }}</h1>
+      </div>
+      {% if channel.description %}
+        <p style="color:var(--muted);font-size:13px;margin-top:6px;">{{ channel.description }}</p>
+      {% endif %}
+    </div>
+    <div class="page-actions">
+      <a href="/statistics?channel={{ channel.channel_id }}"
+         class="btn btn-primary btn-sm">📊 Run Statistics</a>
+      <a href="/channels/{{ channel.channel_id }}/export{{ '?' + request.query_string.decode() if request.query_string else '' }}"
+         class="btn btn-ghost btn-sm">⬇ Export CSV</a>
+    </div>
+  </div>
+
+  <!-- ARCHIVED BANNER -->
+  {% if channel.is_archived %}
+  <div class="archived-banner">
+    📦 This channel is archived. It is read-only and hidden from the main channel list.
+    Use the <a href="/channels?archived=1" style="color:#aaa;text-decoration:underline;">channel list</a> to restore it.
+  </div>
+  {% endif %}
+
+  <!-- WARNING BANNER -->
+  {% if meta.has_bad_trades %}
+  <div class="warn-banner">
+    ⚠ {{ meta.bad_trade_count }} trade{% if meta.bad_trade_count != 1 %}s{% endif %}
+    in this channel {% if meta.bad_trade_count != 1 %}have{% else %}has{% endif %}
+    incomplete price data (<code>price_path_captured = False</code>)
+    and will be excluded from all statistics. Rows marked ⚠ below.
+  </div>
+  {% endif %}
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar" id="filter-bar">
+    <div class="filter-group">
+      <label>Symbol</label>
+      <select name="symbol" id="f-symbol">
+        <option value="all" {% if f_symbol == 'all' %}selected{% endif %}>All symbols</option>
+        {% for sym in filter_options.symbols %}
+          <option value="{{ sym }}" {% if f_symbol == sym %}selected{% endif %}>{{ sym }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Trade type</label>
+      <select name="trade_type" id="f-trade-type">
+        <option value="all"        {% if f_trade_type == 'all'        %}selected{% endif %}>All types</option>
+        <option value="buy_side"   {% if f_trade_type == 'buy_side'   %}selected{% endif %}>Buy side</option>
+        <option value="sell_side"  {% if f_trade_type == 'sell_side'  %}selected{% endif %}>Sell side</option>
+        <option value="buy"        {% if f_trade_type == 'buy'        %}selected{% endif %}>Buy</option>
+        <option value="sell"       {% if f_trade_type == 'sell'       %}selected{% endif %}>Sell</option>
+        <option value="limit_buy"  {% if f_trade_type == 'limit_buy'  %}selected{% endif %}>Limit Buy</option>
+        <option value="limit_sell" {% if f_trade_type == 'limit_sell' %}selected{% endif %}>Limit Sell</option>
+        <option value="stop_buy"   {% if f_trade_type == 'stop_buy'   %}selected{% endif %}>Stop Buy</option>
+        <option value="stop_sell"  {% if f_trade_type == 'stop_sell'  %}selected{% endif %}>Stop Sell</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Outcome</label>
+      <select name="outcome" id="f-outcome">
+        <option value="all"    {% if f_outcome == 'all'    %}selected{% endif %}>All outcomes</option>
+        <option value="hit_tp" {% if f_outcome == 'hit_tp' %}selected{% endif %}>Hit TP</option>
+        <option value="hit_sl" {% if f_outcome == 'hit_sl' %}selected{% endif %}>Hit SL</option>
+        <option value="hit_be" {% if f_outcome == 'hit_be' %}selected{% endif %}>Hit BE</option>
+        <option value="open"   {% if f_outcome == 'open'   %}selected{% endif %}>Open</option>
+        <option value="none"   {% if f_outcome == 'none'   %}selected{% endif %}>No TP set</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>From</label>
+      <input type="date" id="f-date-from" value="{{ f_date_from }}"/>
+    </div>
+    <div class="filter-group">
+      <label>To</label>
+      <input type="date" id="f-date-to" value="{{ f_date_to }}"/>
+    </div>
+    <div class="filter-actions">
+      <button type="button" class="btn btn-primary btn-sm" onclick="applyFilters()">Filter</button>
+      <button type="button" class="btn btn-ghost btn-sm"   onclick="resetFilters()">Reset</button>
+    </div>
+  </div>
+
+  <!-- TP PNL BAR (server-rendered, pure TP data) -->
+  {%
+    set good_trades = trades | selectattr('price_path_captured') | list
+  %}
+  {%
+    set bad_count = trades | rejectattr('price_path_captured') | list | length
+  %}
+  {%
+    set wins  = good_trades | selectattr('outcome_at_user_tp', 'equalto', 'hit_tp') | list
+  %}
+  {%
+    set sls   = good_trades | selectattr('outcome_at_user_tp', 'equalto', 'hit_sl') | list
+  %}
+  {%
+    set bes   = good_trades | selectattr('outcome_at_user_tp', 'equalto', 'hit_be') | list
+  %}
+  {%
+    set evaluated = wins|length + sls|length
+  %}
+  {%
+    set net_r_raw = namespace(v=0.0)
+  %}
+  {%- for t in good_trades if t.pnl_r is not none -%}
+    {%- set net_r_raw.v = net_r_raw.v + t.pnl_r -%}
+  {%- endfor -%}
+  {%
+    set wr = ((wins|length / evaluated * 100) | round(1)) if evaluated > 0 else 0
+  %}
+  <div class="pnl-bar" id="pnl-bar">
+    <div class="pnl-bar-item">
+      <span class="pnl-bar-label">Net R (filtered)</span>
+      <span class="pnl-bar-value {{ 'pos' if net_r_raw.v > 0 else ('neg' if net_r_raw.v < 0 else 'neu') }}">
+        {{ '+' if net_r_raw.v > 0 else '' }}{{ '%.2f'|format(net_r_raw.v) }}R
+      </span>
+    </div>
+    <div class="pnl-bar-item">
+      <span class="pnl-bar-label">Win Rate</span>
+      <span class="pnl-bar-value {{ 'pos' if wr >= 50 else 'neg' }}">
+        {{ wr }}%
+      </span>
+    </div>
+    <div class="pnl-bar-item">
+      <span class="pnl-bar-label">Wins</span>
+      <span class="pnl-bar-value pos">{{ wins|length }}</span>
+    </div>
+    <div class="pnl-bar-item">
+      <span class="pnl-bar-label">Losses (SL)</span>
+      <span class="pnl-bar-value neg">{{ sls|length }}</span>
+    </div>
+    <div class="pnl-bar-item">
+      <span class="pnl-bar-label">BE</span>
+      <span class="pnl-bar-value neu">{{ bes|length }}</span>
+    </div>
+    <div class="pnl-bar-item">
+      <span class="pnl-bar-label">Evaluated</span>
+      <span class="pnl-bar-value acc">{{ evaluated }}</span>
+    </div>
+    {% if bad_count %}
+    <div class="pnl-bar-excluded">⚠ {{ bad_count }} excluded</div>
+    {% endif %}
+  </div>
+
+  <!-- TABLE TOOLBAR -->
+  <div class="table-toolbar">
+    <span class="table-toolbar-left">Click any row to view full trade detail</span>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <div class="toggle-pill">
+        <button id="view-btn-tp"   class="active" onclick="setPageView('tp')">TP View</button>
+        <button id="view-btn-untp"             onclick="setPageView('untp')">UNTP View</button>
+      </div>
+      <div class="toggle-pill">
+        <button id="toggle-rr"   class="active" onclick="setUnit('rr')">R</button>
+        <button id="toggle-pips"              onclick="setUnit('pips')">Pips</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════ TP SECTION ═══════════════════════ -->
+  <div id="tp-section">
+    {% set TABLE_COLS = 13 %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Symbol</th>
+            <th>Type</th>
+            <th>Entry Time</th>
+            <th>Entry</th>
+            <th>SL</th>
+            <th>TP</th>
+            <th>Outcome</th>
+            <th>PnL</th>
+            <th>Dip (pips)</th>
+            <th>Notes</th>
+            <th>Saved</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="trade-tbody">
+          {% if trades %}
+            {% for t in trades %}
+            {% set dp = 2 if t.symbol in ['XAUUSD','NAS100','US30','USTEC','USOIL','UKOIL','XAGUSD'] or t.symbol.endswith('JPY') else 5 %}
+            {% set fmt = '%.'+dp|string+'f' %}
+            <tr id="row-{{ t.trade_id }}"
+                class="{% if not t.price_path_captured %}row-bad-data{% endif %}"
+                data-trade-id="{{ t.trade_id }}"
+                data-action="open-drawer">
+              <td style="color:var(--muted);font-size:11px;">
+                {{ t.trade_id }}
+                {% if not t.price_path_captured %}
+                  <span class="badge-bad-data" title="Incomplete price data — excluded from statistics">⚠</span>
+                {% endif %}
+              </td>
+              <td style="font-weight:600;">{{ t.symbol }}</td>
+              <td><span class="type-tag">{{ t.trade_type }}</span></td>
+              <td>{{ t.entry_time.strftime('%Y-%m-%d %H:%M') if t.entry_time else '—' }}</td>
+              <td>{{ fmt|format(t.entry_price) if t.entry_price else '—' }}</td>
+              <td style="color:var(--danger);">{{ fmt|format(t.stoploss_price) if t.stoploss_price else '—' }}</td>
+              <td style="color:var(--success);">
+                {% if t.takeprofit_price %}{{ fmt|format(t.takeprofit_price) }}{% else %}<span style="color:var(--muted)">—</span>{% endif %}
+              </td>
+              <td>
+                {% if t.outcome_at_user_tp == 'hit_tp' %}<span class="badge badge-tp">Hit TP</span>
+                {% elif t.outcome_at_user_tp == 'hit_sl' %}<span class="badge badge-sl">Hit SL</span>
+                {% elif t.outcome_at_user_tp == 'hit_be' %}<span class="badge badge-be">Hit BE</span>
+                {% elif t.outcome_at_user_tp == 'open' %}<span class="badge badge-open">Open</span>
+                {% else %}<span class="badge badge-none">No TP</span>{% endif %}
+              </td>
+              <td>
+                {% if t.pnl_r is not none %}
+                  {% if t.pnl_r > 0 %}
+                    <span class="pnl-pos">
+                      <span class="unit-rr">+{{ '%.2f'|format(t.pnl_r) }}R</span>
+                      <span class="unit-pips">{% if t.sl_distance_pips is not none %}+{{ '%.1f'|format(t.pnl_r * t.sl_distance_pips) }}p{% else %}—{% endif %}</span>
+                    </span>
+                  {% elif t.pnl_r < 0 %}
+                    <span class="pnl-neg">
+                      <span class="unit-rr">{{ '%.2f'|format(t.pnl_r) }}R</span>
+                      <span class="unit-pips">{% if t.sl_distance_pips is not none %}-{{ '%.1f'|format(t.sl_distance_pips) }}p{% else %}—{% endif %}</span>
+                    </span>
+                  {% else %}
+                    <span class="pnl-zero">
+                      <span class="unit-rr">0.00R</span>
+                      <span class="unit-pips">0.0p</span>
+                    </span>
+                  {% endif %}
+                {% else %}<span style="color:var(--muted);">—</span>{% endif %}
+              </td>
+              <td>{{ '%.1f'|format(t.dip_pips) if t.dip_pips is not none else '—' }}</td>
+              <td class="notes-cell" title="{{ t.notes or '' }}">
+                {% if t.notes %}{{ t.notes }}{% else %}<span style="color:var(--muted);">—</span>{% endif %}
+              </td>
+              <td style="font-size:11px;color:var(--muted);">
+                {{ t.saved_at.strftime('%d %b %y') if t.saved_at else '—' }}
+              </td>
+              <td>
+                <div class="row-actions">
+                  <button class="btn btn-ghost btn-sm btn-icon"
+                          data-action="move" data-trade-id="{{ t.trade_id }}"
+                          title="Move to another channel">↔</button>
+                  <button class="btn btn-danger-outline btn-sm btn-icon"
+                          data-action="del" data-trade-id="{{ t.trade_id }}"
+                          title="Delete trade">✕</button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr class="empty-row">
+              <td colspan="{{ TABLE_COLS }}">No trades match your filters.</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+      <div class="table-footer">
+        <span id="count-label"
+              data-filtered="{{ 'true' if (f_symbol != 'all' or f_outcome != 'all' or f_trade_type != 'all' or f_date_from or f_date_to) else 'false' }}">
+          {{ trades|length }} trade{% if trades|length != 1 %}s{% endif %}{% if f_symbol != 'all' or f_outcome != 'all' or f_trade_type != 'all' or f_date_from or f_date_to %} (filtered){% endif %}
+        </span>
+        <span>Total in channel: {{ meta.trade_count }}</span>
+      </div>
+    </div><!-- /.table-wrap -->
+  </div><!-- /#tp-section -->
+
+  <!-- ═══════════════════════ UNTP SECTION ═══════════════════════ -->
+  <div id="untp-section" style="display:none;">
+
+    <!-- Header + window controls -->
+    <div class="untp-section-header">
+      <span class="untp-section-title">UNTP Walk</span>
+      <div class="untp-window-controls">
+        <label for="untp-page-slider">Window:</label>
+        <input type="range" id="untp-page-slider" min="0" max="13" step="1" value="13"
+               oninput="onUntpPageSlider()">
+        <input type="number" class="untp-window-box" id="untp-page-box"
+               placeholder="mins" min="1" max="30240"
+               oninput="onUntpPageBox()">
+        <span class="untp-window-resolved" id="untp-page-resolved">21d (504h)</span>
+      </div>
+    </div>
+
+    <!-- UNTP PnL bar -->
+    <div class="pnl-bar" id="untp-pnl-bar">
+      <div class="pnl-bar-item">
+        <span class="pnl-bar-label">Net R (UNTP)</span>
+        <span class="pnl-bar-value neu" id="untp-bar-netr">—</span>
+      </div>
+      <div class="pnl-bar-item">
+        <span class="pnl-bar-label">Running</span>
+        <span class="pnl-bar-value acc" id="untp-bar-running">—</span>
+      </div>
+      <div class="pnl-bar-item">
+        <span class="pnl-bar-label">Loss (SL)</span>
+        <span class="pnl-bar-value neg" id="untp-bar-losses">—</span>
+      </div>
+      <div class="pnl-bar-item">
+        <span class="pnl-bar-label">BE</span>
+        <span class="pnl-bar-value neu" id="untp-bar-bes">—</span>
+      </div>
+    </div>
+
+    <!-- UNTP table (JS-rendered) -->
+    <div class="untp-table-container">
+      <div class="table-wrap" id="untp-table-wrap">
+        <!-- filled by renderUntpTable() -->
+      </div>
+    </div>
+
+  </div><!-- /#untp-section -->
+
+</div><!-- /.page -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     TRADE DATA — embedded JSON for drawers (no AJAX needed)
+═══════════════════════════════════════════════════════════ -->
+<script id="trades-data" type="application/json">
+{
+  {% for t in trades %}
+  "{{ t.trade_id }}": {
+    "trade_id":                       {{ t.trade_id }},
+    "symbol":                         "{{ t.symbol }}",
+    "trade_type":                     "{{ t.trade_type }}",
+    "entry_time":                     "{{ t.entry_time.strftime('%Y-%m-%d %H:%M') if t.entry_time else '' }}",
+    "entry_price":                    {{ t.entry_price or 'null' }},
+    "stoploss_price":                 {{ t.stoploss_price or 'null' }},
+    "takeprofit_price":               {{ t.takeprofit_price if t.takeprofit_price is not none else 'null' }},
+    "limit_price":                    {{ t.limit_price if t.limit_price is not none else 'null' }},
+    "input_type":                     "{{ t.input_type or '' }}",
+    "sl_distance_pips":               {{ t.sl_distance_pips if t.sl_distance_pips is not none else 'null' }},
+    "tp_rr_target":                   {{ t.tp_rr_target if t.tp_rr_target is not none else 'null' }},
+    "tp_pips_target":                 {{ t.tp_pips_target if t.tp_pips_target is not none else 'null' }},
+    "outcome_at_user_tp":             "{{ t.outcome_at_user_tp or '' }}",
+    "pnl_r":                          {{ t.pnl_r if t.pnl_r is not none else 'null' }},
+    "exit_price":                     {{ t.exit_price if t.exit_price is not none else 'null' }},
+    "time_to_resolution_minutes":     {{ t.time_to_resolution_minutes if t.time_to_resolution_minutes is not none else 'null' }},
+    "candles_to_resolution":          {{ t.candles_to_resolution if t.candles_to_resolution is not none else 'null' }},
+    "time_to_tp_minutes":             {{ t.time_to_tp_minutes if t.time_to_tp_minutes is not none else 'null' }},
+    "mfe_r":                          {{ t.mfe_r if t.mfe_r is not none else 'null' }},
+    "mfe_pips":                       {{ t.mfe_pips if t.mfe_pips is not none else 'null' }},
+    "mfe_at_close_r":                 {{ t.mfe_at_close_r if t.mfe_at_close_r is not none else 'null' }},
+    "time_to_mfe_minutes":            {{ t.time_to_mfe_minutes if t.time_to_mfe_minutes is not none else 'null' }},
+    "mae_r":                          {{ t.mae_r if t.mae_r is not none else 'null' }},
+    "mae_pips":                       {{ t.mae_pips if t.mae_pips is not none else 'null' }},
+    "time_to_mae_minutes":            {{ t.time_to_mae_minutes if t.time_to_mae_minutes is not none else 'null' }},
+    "dip_pips":                       {{ t.dip_pips if t.dip_pips is not none else 'null' }},
+    "dip_time_minutes":               {{ t.dip_time_minutes if t.dip_time_minutes is not none else 'null' }},
+    "dip_occurred":                   {{ 'true' if t.dip_occurred else 'false' }},
+    "retracement_from_mfe_r":         {{ t.retracement_from_mfe_r if t.retracement_from_mfe_r is not none else 'null' }},
+    "retracement_from_mfe_pips":      {{ t.retracement_from_mfe_pips if t.retracement_from_mfe_pips is not none else 'null' }},
+    "breakeven_active":               {{ 'true' if t.breakeven_active else 'false' }},
+    "breakeven_type":                 "{{ t.breakeven_type or '' }}",
+    "breakeven_value":                {{ t.breakeven_value if t.breakeven_value is not none else 'null' }},
+    "breakeven_triggered":            {{ 'true' if t.breakeven_triggered else 'false' }},
+    "breakeven_trigger_time_minutes": {{ t.breakeven_trigger_time_minutes if t.breakeven_trigger_time_minutes is not none else 'null' }},
+    "mfe_at_breakeven_r":             {{ t.mfe_at_breakeven_r if t.mfe_at_breakeven_r is not none else 'null' }},
+    "mfe_at_breakeven_pips":          {{ t.mfe_at_breakeven_pips if t.mfe_at_breakeven_pips is not none else 'null' }},
+    "mfe_after_be_r":                 {{ t.mfe_after_be_r if t.mfe_after_be_r is not none else 'null' }},
+    "mfe_after_be_pips":              {{ t.mfe_after_be_pips if t.mfe_after_be_pips is not none else 'null' }},
+    "time_to_0_5r_minutes":           {{ t.time_to_0_5r_minutes if t.time_to_0_5r_minutes is not none else 'null' }},
+    "time_to_1r_minutes":             {{ t.time_to_1r_minutes if t.time_to_1r_minutes is not none else 'null' }},
+    "time_to_1_5r_minutes":           {{ t.time_to_1_5r_minutes if t.time_to_1_5r_minutes is not none else 'null' }},
+    "time_to_2r_minutes":             {{ t.time_to_2r_minutes if t.time_to_2r_minutes is not none else 'null' }},
+    "time_to_3r_minutes":             {{ t.time_to_3r_minutes if t.time_to_3r_minutes is not none else 'null' }},
+    "time_to_4r_minutes":             {{ t.time_to_4r_minutes if t.time_to_4r_minutes is not none else 'null' }},
+    "time_to_5r_minutes":             {{ t.time_to_5r_minutes if t.time_to_5r_minutes is not none else 'null' }},
+    "pending_order_triggered":        {{ 'true' if t.pending_order_triggered else ('null' if t.pending_order_triggered is none else 'false') }},
+    "pending_wait_minutes":           {{ t.pending_wait_minutes if t.pending_wait_minutes is not none else 'null' }},
+    "pending_trigger_time":           "{{ t.pending_trigger_time.strftime('%Y-%m-%d %H:%M') if t.pending_trigger_time else '' }}",
+    "first_candle_direction":         "{{ t.first_candle_direction or '' }}",
+    "consecutive_adverse_candles":    {{ t.consecutive_adverse_candles if t.consecutive_adverse_candles is not none else 'null' }},
+    "avg_candle_size_pips_at_entry":  {{ t.avg_candle_size_pips_at_entry if t.avg_candle_size_pips_at_entry is not none else 'null' }},
+    "entry_session":                  "{{ t.entry_session or '' }}",
+    "entry_day_of_week":              {{ t.entry_day_of_week if t.entry_day_of_week is not none else 'null' }},
+    "entry_hour":                     {{ t.entry_hour if t.entry_hour is not none else 'null' }},
+    "channel_streak_at_save":         {{ t.channel_streak_at_save if t.channel_streak_at_save is not none else 'null' }},
+    "price_path_captured":            {{ 'true' if t.price_path_captured else 'false' }},
+    "notes":                          {{ ('"' + t.notes|replace('"', '\\"')|replace('\n', '\\n') + '"') if t.notes else 'null' }},
+    "untp_notes":                     {{ ('"' + t.untp_notes|replace('"', '\\"')|replace('\n', '\\n') + '"') if t.untp_notes else 'null' }},
+    "saved_at":                       "{{ t.saved_at.strftime('%Y-%m-%d %H:%M') if t.saved_at else '' }}",
+    "mfe_path_json":                  {{ t.mfe_path_json if t.mfe_path_json else 'null' }},
+    "mfe_at_30min_r":  {{ t.mfe_at_30min_r  if t.mfe_at_30min_r  is not none else 'null' }}, "mae_at_30min_r":  {{ t.mae_at_30min_r  if t.mae_at_30min_r  is not none else 'null' }}, "alive_at_30min":  {{ 'true' if t.alive_at_30min  else 'false' }},
+    "mfe_at_1h_r":     {{ t.mfe_at_1h_r     if t.mfe_at_1h_r     is not none else 'null' }}, "mae_at_1h_r":     {{ t.mae_at_1h_r     if t.mae_at_1h_r     is not none else 'null' }}, "alive_at_1h":     {{ 'true' if t.alive_at_1h     else 'false' }},
+    "mfe_at_2h_r":     {{ t.mfe_at_2h_r     if t.mfe_at_2h_r     is not none else 'null' }}, "mae_at_2h_r":     {{ t.mae_at_2h_r     if t.mae_at_2h_r     is not none else 'null' }}, "alive_at_2h":     {{ 'true' if t.alive_at_2h     else 'false' }},
+    "mfe_at_4h_r":     {{ t.mfe_at_4h_r     if t.mfe_at_4h_r     is not none else 'null' }}, "mae_at_4h_r":     {{ t.mae_at_4h_r     if t.mae_at_4h_r     is not none else 'null' }}, "alive_at_4h":     {{ 'true' if t.alive_at_4h     else 'false' }},
+    "mfe_at_8h_r":     {{ t.mfe_at_8h_r     if t.mfe_at_8h_r     is not none else 'null' }}, "mae_at_8h_r":     {{ t.mae_at_8h_r     if t.mae_at_8h_r     is not none else 'null' }}, "alive_at_8h":     {{ 'true' if t.alive_at_8h     else 'false' }},
+    "mfe_at_12h_r":    {{ t.mfe_at_12h_r    if t.mfe_at_12h_r    is not none else 'null' }}, "mae_at_12h_r":    {{ t.mae_at_12h_r    if t.mae_at_12h_r    is not none else 'null' }}, "alive_at_12h":    {{ 'true' if t.alive_at_12h    else 'false' }},
+    "mfe_at_24h_r":    {{ t.mfe_at_24h_r    if t.mfe_at_24h_r    is not none else 'null' }}, "mae_at_24h_r":    {{ t.mae_at_24h_r    if t.mae_at_24h_r    is not none else 'null' }}, "alive_at_24h":    {{ 'true' if t.alive_at_24h    else 'false' }},
+    "mfe_at_48h_r":    {{ t.mfe_at_48h_r    if t.mfe_at_48h_r    is not none else 'null' }}, "mae_at_48h_r":    {{ t.mae_at_48h_r    if t.mae_at_48h_r    is not none else 'null' }}, "alive_at_48h":    {{ 'true' if t.alive_at_48h    else 'false' }},
+    "mfe_at_72h_r":    {{ t.mfe_at_72h_r    if t.mfe_at_72h_r    is not none else 'null' }}, "mae_at_72h_r":    {{ t.mae_at_72h_r    if t.mae_at_72h_r    is not none else 'null' }}, "alive_at_72h":    {{ 'true' if t.alive_at_72h    else 'false' }},
+    "mfe_at_120h_r":   {{ t.mfe_at_120h_r   if t.mfe_at_120h_r   is not none else 'null' }}, "mae_at_120h_r":   {{ t.mae_at_120h_r   if t.mae_at_120h_r   is not none else 'null' }}, "alive_at_120h":   {{ 'true' if t.alive_at_120h   else 'false' }},
+    "mfe_at_168h_r":   {{ t.mfe_at_168h_r   if t.mfe_at_168h_r   is not none else 'null' }}, "mae_at_168h_r":   {{ t.mae_at_168h_r   if t.mae_at_168h_r   is not none else 'null' }}, "alive_at_168h":   {{ 'true' if t.alive_at_168h   else 'false' }},
+    "mfe_at_240h_r":   {{ t.mfe_at_240h_r   if t.mfe_at_240h_r   is not none else 'null' }}, "mae_at_240h_r":   {{ t.mae_at_240h_r   if t.mae_at_240h_r   is not none else 'null' }}, "alive_at_240h":   {{ 'true' if t.alive_at_240h   else 'false' }},
+    "mfe_at_336h_r":   {{ t.mfe_at_336h_r   if t.mfe_at_336h_r   is not none else 'null' }}, "mae_at_336h_r":   {{ t.mae_at_336h_r   if t.mae_at_336h_r   is not none else 'null' }}, "alive_at_336h":   {{ 'true' if t.alive_at_336h   else 'false' }},
+    "mfe_at_504h_r":   {{ t.mfe_at_504h_r   if t.mfe_at_504h_r   is not none else 'null' }}, "mae_at_504h_r":   {{ t.mae_at_504h_r   if t.mae_at_504h_r   is not none else 'null' }}, "alive_at_504h":   {{ 'true' if t.alive_at_504h   else 'false' }}
+  }{% if not loop.last %},{% endif %}
+  {% else %}
+  {% endfor %}
+}
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TRADE WALK DRAWER
+═══════════════════════════════════════════════════════════ -->
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<div class="drawer" id="tradeDrawer" role="dialog" aria-modal="true" aria-label="Trade Detail">
+  <div class="drawer-head">
+    <div class="drawer-head-info">
+      <div class="drawer-symbol" id="d-symbol">—</div>
+      <div class="drawer-meta" id="d-meta">—</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px;opacity:.6;">← → to navigate trades</div>
+    </div>
+    <button class="drawer-close" onclick="closeDrawer()" title="Close (Esc)">✕</button>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+  <div class="drawer-foot">
+    <button class="btn btn-ghost btn-sm" id="d-move-btn" onclick="drawerMove()">↔ Move</button>
+    <button class="btn btn-danger-outline btn-sm" id="d-del-btn" onclick="drawerDelete()">✕ Delete</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     UNTP WALK DRAWER (completely independent)
+═══════════════════════════════════════════════════════════ -->
+<div class="drawer-overlay" id="untpDrawerOverlay"></div>
+<div class="drawer" id="untpDrawer" role="dialog" aria-modal="true" aria-label="UNTP Walk Detail">
+  <div class="drawer-head">
+    <div class="drawer-head-info">
+      <div class="drawer-symbol" id="ud-symbol">—</div>
+      <div class="drawer-meta" id="ud-meta">—</div>
+      <div style="font-size:10px;color:var(--accent2);margin-top:4px;opacity:.8;">UNTP Walk View</div>
+    </div>
+    <button class="drawer-close" onclick="closeUntpDrawer()" title="Close (Esc)">✕</button>
+  </div>
+  <div class="drawer-body" id="untp-drawer-body"></div>
+  <div class="drawer-foot">
+    <span style="font-size:11px;color:var(--muted);">UNTP Walk · TP-independent analysis</span>
+  </div>
+</div>
+
+<!-- DELETE MODAL -->
+<div class="modal-overlay" id="deleteModal" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3>Delete Trade</h3>
+    <p>Permanently delete this trade? This cannot be undone.</p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('deleteModal')">Cancel</button>
+      <button class="btn btn-danger" id="delete-confirm-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- MOVE MODAL -->
+<div class="modal-overlay" id="moveModal" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3>Move Trade</h3>
+    {% if all_channels %}
+    <div>
+      <label for="move-channel-select">Move to channel</label>
+      <select id="move-channel-select">
+        {% for ch in all_channels %}
+          <option value="{{ ch.channel_id }}">{{ ch.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('moveModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitMove()">Move</button>
+    </div>
+    {% else %}
+    <p>No other channels exist. Create another channel first.</p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('moveModal')">Close</button>
+      <a href="/channels" class="btn btn-primary">Manage Channels</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- PAGE CONFIG -->
+<div id="page-config"
+     data-channel-id="{{ channel.channel_id }}"
+     data-has-channels="{{ 'true' if all_channels else 'false' }}"
+     data-table-cols="{{ TABLE_COLS }}"
+     style="display:none;"></div>
+
+<!-- TOAST -->
+<div id="toast" aria-live="polite"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+document.querySelectorAll('[data-color]').forEach(el => {
+  el.style.background = el.dataset.color;
+});
+
+const PAGE = (() => {
+  const el = document.getElementById('page-config');
+  return {
+    channelId:   el.dataset.channelId,
+    hasChannels: el.dataset.hasChannels === 'true',
+    tableCols:   parseInt(el.dataset.tableCols, 10),
+  };
+})();
+
+const TRADES = JSON.parse(document.getElementById('trades-data').textContent || '{}');
+
+// ── UNTP CHECKPOINT MAP ────────────────────────────────────────
+const UNTP_CPS = [
+  { key: '30min', mfe: 'mfe_at_30min_r', mae: 'mae_at_30min_r', alive: 'alive_at_30min' },
+  { key: '1h',    mfe: 'mfe_at_1h_r',    mae: 'mae_at_1h_r',    alive: 'alive_at_1h'    },
+  { key: '2h',    mfe: 'mfe_at_2h_r',    mae: 'mae_at_2h_r',    alive: 'alive_at_2h'    },
+  { key: '4h',    mfe: 'mfe_at_4h_r',    mae: 'mae_at_4h_r',    alive: 'alive_at_4h'    },
+  { key: '8h',    mfe: 'mfe_at_8h_r',    mae: 'mae_at_8h_r',    alive: 'alive_at_8h'    },
+  { key: '12h',   mfe: 'mfe_at_12h_r',   mae: 'mae_at_12h_r',   alive: 'alive_at_12h'   },
+  { key: '24h',   mfe: 'mfe_at_24h_r',   mae: 'mae_at_24h_r',   alive: 'alive_at_24h'   },
+  { key: '48h',   mfe: 'mfe_at_48h_r',   mae: 'mae_at_48h_r',   alive: 'alive_at_48h'   },
+  { key: '72h',   mfe: 'mfe_at_72h_r',   mae: 'mae_at_72h_r',   alive: 'alive_at_72h'   },
+  { key: '120h',  mfe: 'mfe_at_120h_r',  mae: 'mae_at_120h_r',  alive: 'alive_at_120h'  },
+  { key: '168h',  mfe: 'mfe_at_168h_r',  mae: 'mae_at_168h_r',  alive: 'alive_at_168h'  },
+  { key: '240h',  mfe: 'mfe_at_240h_r',  mae: 'mae_at_240h_r',  alive: 'alive_at_240h'  },
+  { key: '336h',  mfe: 'mfe_at_336h_r',  mae: 'mae_at_336h_r',  alive: 'alive_at_336h'  },
+  { key: '504h',  mfe: 'mfe_at_504h_r',  mae: 'mae_at_504h_r',  alive: 'alive_at_504h'  },
+];
+const UNTP_CP_MINS   = [30,60,120,240,480,720,1440,2880,4320,7200,10080,14400,20160,30240];
+const UNTP_CP_LABELS = ['30min','1h','2h','4h','8h','12h','1d','2d','3d','5d','1w','10d','14d','21d'];
+
+// ── STATE ──────────────────────────────────────────────────────
+let _openTradeId     = null;  // currently open TP drawer
+let _untpOpenTradeId = null;  // currently open UNTP drawer
+let _deleteTradeId   = null;
+let _moveTradeId     = null;
+let _pageView        = 'tp';  // 'tp' | 'untp'
+let _untpPageMins    = 30240; // current UNTP window in minutes
+
+// ═══════════════════════════════════════════════════════════════
+// PAGE VIEW TOGGLE
+// ═══════════════════════════════════════════════════════════════
+function setPageView(view) {
+  _pageView = view;
+  document.getElementById('tp-section').style.display   = view === 'tp'   ? '' : 'none';
+  document.getElementById('untp-section').style.display = view === 'untp' ? '' : 'none';
+  document.getElementById('view-btn-tp').classList.toggle('active',   view === 'tp');
+  document.getElementById('view-btn-untp').classList.toggle('active', view === 'untp');
+  if (view === 'untp') renderUntpTable();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UNIT TOGGLE (R / Pips)
+// ═══════════════════════════════════════════════════════════════
+function setUnit(unit) {
+  document.body.classList.toggle('show-pips', unit === 'pips');
+  document.getElementById('toggle-rr').classList.toggle('active',   unit === 'rr');
+  document.getElementById('toggle-pips').classList.toggle('active', unit === 'pips');
+  if (_openTradeId)     renderDrawerContent(TRADES[_openTradeId]);
+  if (_untpOpenTradeId) renderUntpDrawerContent(TRADES[_untpOpenTradeId]);
+  if (_pageView === 'untp') renderUntpTable();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════
+function fmt(v, dp) {
+  if (v === null || v === undefined) return '—';
+  return v.toFixed(dp);
+}
+
+function fmtDuration(mins) {
+  if (mins === null || mins === undefined) return '—';
+  const total = Math.round(mins);
+  if (total < 60) return total + 'm';
+  const d = Math.floor(total / 1440);
+  const h = Math.floor((total % 1440) / 60);
+  const m = total % 60;
+  if (d > 0) return h > 0 ? `${d}d ${h}h` : `${d}d`;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+function localTime(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr.replace(' ', 'T'));
+  if (isNaN(d)) return dateStr;
+  return d.toLocaleString(undefined, {
+    month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+}
+
+function eventTime(entryStr, offsetMins) {
+  if (!entryStr || offsetMins === null || offsetMins === undefined) return '—';
+  const d = new Date(entryStr.replace(' ', 'T'));
+  if (isNaN(d)) return '—';
+  d.setMinutes(d.getMinutes() + Math.round(offsetMins));
+  return d.toLocaleString(undefined, {
+    month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(String(s || '')));
+  return d.innerHTML;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UNTP HELPERS
+// ═══════════════════════════════════════════════════════════════
+
+// Resolve best UNTP peak ref for use in Trade Walk analysis section.
+// Returns { mfe, mae, alive, label, stopped }
+function resolveUntpRef(t) {
+  let bestMfe = null, bestMae = null, stopped = true;
+  for (const cp of UNTP_CPS) {
+    if (t[cp.alive]) {
+      stopped = false;
+      if (t[cp.mfe] !== null && (bestMfe === null || t[cp.mfe] > bestMfe)) {
+        bestMfe = t[cp.mfe];
+        bestMae = t[cp.mae];
+      }
+    }
+  }
+  if (bestMfe === null) { bestMfe = t.mfe_r; bestMae = t.mae_r; stopped = true; }
+  return { mfe: bestMfe, mae: bestMae, alive: !stopped, label: 'UNTP peak', stopped };
+}
+
+// Resolve UNTP state at an arbitrary window (minutes).
+// Priority: exact checkpoint → mfe_path_json → nearest checkpoint
+// BUG-3 aware: path entries are [elapsed_min, mfe_r, mae_r, untp_alive]
+function resolveUntpAtWindow(t, targetMins) {
+  // 1. Exact checkpoint match
+  for (let i = 0; i < UNTP_CPS.length; i++) {
+    if (UNTP_CP_MINS[i] === targetMins) {
+      return {
+        mfe: t[UNTP_CPS[i].mfe],
+        mae: t[UNTP_CPS[i].mae],
+        alive: t[UNTP_CPS[i].alive],
+        resolvedMins: targetMins,
+        fromPath: false,
+      };
+    }
+  }
+  // 2. Walk mfe_path_json for arbitrary minutes
+  if (t.mfe_path_json) {
+    try {
+      const path = typeof t.mfe_path_json === 'string'
+        ? JSON.parse(t.mfe_path_json) : t.mfe_path_json;
+      // path is ascending by elapsed_min; take last entry <= targetMins
+      let best = null;
+      for (const entry of path) {
+        if (entry[0] <= targetMins) best = entry;
+        else break;
+      }
+      if (best) {
+        return {
+          mfe: best[1],
+          mae: best[2],
+          alive: best[3] === 1 || best[3] === true,
+          resolvedMins: best[0],
+          fromPath: true,
+        };
+      }
+    } catch(e) { /* fall through */ }
+  }
+  // 3. Nearest checkpoint fallback
+  let bestIdx = 0, bestDiff = Infinity;
+  for (let i = 0; i < UNTP_CP_MINS.length; i++) {
+    const d = Math.abs(UNTP_CP_MINS[i] - targetMins);
+    if (d < bestDiff) { bestDiff = d; bestIdx = i; }
+  }
+  return {
+    mfe: t[UNTP_CPS[bestIdx].mfe],
+    mae: t[UNTP_CPS[bestIdx].mae],
+    alive: t[UNTP_CPS[bestIdx].alive],
+    resolvedMins: UNTP_CP_MINS[bestIdx],
+    fromPath: false,
+  };
+}
+
+// Classify a trade for the UNTP PnL bar and table.
+// Returns { bucket: 'running'|'loss'|'be', pnl, mfe, mae } or null if excluded.
+function classifyUntpTrade(t, targetMins) {
+  if (!t.price_path_captured) return null;
+  const w = resolveUntpAtWindow(t, targetMins);
+  if (w.alive) {
+    return { bucket: 'running', pnl: w.mfe ?? 0, mfe: w.mfe, mae: w.mae, alive: true };
+  } else if (t.breakeven_triggered) {
+    return { bucket: 'be', pnl: 0.0, mfe: w.mfe, mae: w.mae, alive: false };
+  } else {
+    return { bucket: 'loss', pnl: -1.0, mfe: w.mfe, mae: w.mae, alive: false };
+  }
+}
+
+// Peak MFE across all alive checkpoints AND path entries (independent of window).
+// Checkpoints alone miss peaks that occur between checkpoint timestamps.
+// mfe_path_json samples every 15 min (BUG-3 aware) and captures those in-between highs.
+function untpPeakMfe(t) {
+  let peak = null;
+  // 1. Scan 14 UNTP checkpoints
+  for (const cp of UNTP_CPS) {
+    if (t[cp.alive] && t[cp.mfe] !== null) {
+      if (peak === null || t[cp.mfe] > peak) peak = t[cp.mfe];
+    }
+  }
+  // 2. Scan mfe_path_json for peaks between checkpoints
+  if (t.mfe_path_json) {
+    try {
+      const path = typeof t.mfe_path_json === 'string'
+        ? JSON.parse(t.mfe_path_json) : t.mfe_path_json;
+      for (const entry of path) {
+        const alive = entry[3] === 1 || entry[3] === true;
+        if (alive && entry[1] !== null && entry[1] !== undefined) {
+          if (peak === null || entry[1] > peak) peak = entry[1];
+        }
+      }
+    } catch(e) { /* ignore malformed path */ }
+  }
+  return peak ?? t.mfe_r;
+}
+
+// Last checkpoint index where alive=true.
+function untpLastAliveIdx(t) {
+  let last = -1;
+  for (let i = 0; i < UNTP_CPS.length; i++) {
+    if (t[UNTP_CPS[i].alive]) last = i;
+  }
+  return last;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UNTP PAGE WINDOW CONTROLS
+// ═══════════════════════════════════════════════════════════════
+function _syncUntpPageResolved(mins) {
+  // Find the closest checkpoint label
+  let bestIdx = 0, bestDiff = Infinity;
+  for (let i = 0; i < UNTP_CP_MINS.length; i++) {
+    const d = Math.abs(UNTP_CP_MINS[i] - mins);
+    if (d < bestDiff) { bestDiff = d; bestIdx = i; }
+  }
+  document.getElementById('untp-page-resolved').textContent =
+    UNTP_CP_LABELS[bestIdx] + ' (' + fmtDuration(UNTP_CP_MINS[bestIdx]) + ')';
+}
+
+function onUntpPageSlider() {
+  const idx = parseInt(document.getElementById('untp-page-slider').value);
+  _untpPageMins = UNTP_CP_MINS[idx];
+  document.getElementById('untp-page-box').value = _untpPageMins;
+  document.getElementById('untp-page-resolved').textContent =
+    UNTP_CP_LABELS[idx] + ' (' + fmtDuration(UNTP_CP_MINS[idx]) + ')';
+  renderUntpTable();
+  if (_untpOpenTradeId) renderUntpDrawerContent(TRADES[_untpOpenTradeId]);
+}
+
+function onUntpPageBox() {
+  const raw = parseInt(document.getElementById('untp-page-box').value);
+  if (!raw || raw < 1) return;
+  _untpPageMins = raw;
+  // Snap slider to nearest checkpoint index
+  let bestIdx = 0, bestDiff = Infinity;
+  for (let i = 0; i < UNTP_CP_MINS.length; i++) {
+    const d = Math.abs(UNTP_CP_MINS[i] - raw);
+    if (d < bestDiff) { bestDiff = d; bestIdx = i; }
+  }
+  document.getElementById('untp-page-slider').value = bestIdx;
+  _syncUntpPageResolved(raw);
+  renderUntpTable();
+  if (_untpOpenTradeId) renderUntpDrawerContent(TRADES[_untpOpenTradeId]);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UNTP TABLE
+// ═══════════════════════════════════════════════════════════════
+function renderUntpTable() {
+  const usePips = document.body.classList.contains('show-pips');
+  let running = 0, losses = 0, bes = 0, netR = 0;
+  const rows = [];
+
+  const tradeList = Object.values(TRADES);
+  for (const t of tradeList) {
+    const cls = classifyUntpTrade(t, _untpPageMins);
+    if (!cls) continue;
+
+    const peak = untpPeakMfe(t);
+    const laIdx = untpLastAliveIdx(t);
+
+    if (cls.bucket === 'running') running++;
+    else if (cls.bucket === 'loss') losses++;
+    else bes++;
+    netR += cls.pnl;
+
+    // Outcome label + badge
+    let ocLabel, ocCls;
+    if (cls.bucket === 'running') {
+      ocLabel = cls.mfe >= 0 ? 'Running +' : 'Running −';
+      ocCls   = cls.mfe >= 0 ? 'badge-run' : 'badge-sl';
+    } else if (cls.bucket === 'be') {
+      ocLabel = 'Stopped BE'; ocCls = 'badge-be';
+    } else {
+      ocLabel = 'Stopped SL'; ocCls = 'badge-sl';
+    }
+
+    const slDist = t.sl_distance_pips;
+    const mfeFmt = cls.mfe !== null
+      ? (usePips && slDist
+          ? (cls.mfe >= 0 ? '+' : '') + (cls.mfe * slDist).toFixed(1) + 'p'
+          : (cls.mfe >= 0 ? '+' : '') + cls.mfe.toFixed(3) + 'R')
+      : '—';
+    const maeFmt = cls.mae !== null
+      ? (usePips && slDist
+          ? (cls.mae * slDist).toFixed(1) + 'p'
+          : cls.mae.toFixed(3) + 'R')
+      : '—';
+    const pnlSign = cls.pnl > 0 ? '+' : '';
+    const pnlFmt  = pnlSign + cls.pnl.toFixed(2) + 'R';
+    const peakFmt = peak !== null
+      ? (usePips && slDist
+          ? '+' + (peak * slDist).toFixed(1) + 'p'
+          : '+' + peak.toFixed(3) + 'R')
+      : '—';
+    const mfeCls = cls.mfe !== null ? (cls.mfe >= 0 ? 'pnl-pos' : 'pnl-neg') : '';
+    const pnlCls = cls.pnl > 0 ? 'pnl-pos' : cls.pnl < 0 ? 'pnl-neg' : 'pnl-zero';
+
+    rows.push(`
+      <tr class="trade-row" onclick="openUntpDrawer(${t.trade_id})">
+        <td style="color:var(--muted);font-size:11px;">${t.trade_id}</td>
+        <td style="font-weight:600;">${esc(t.symbol)}</td>
+        <td><span class="type-tag">${esc(t.trade_type)}</span></td>
+        <td>${t.entry_time || '—'}</td>
+        <td><span class="badge ${ocCls}">${ocLabel}</span></td>
+        <td class="${mfeCls}">${mfeFmt}</td>
+        <td class="pnl-neg">${maeFmt}</td>
+        <td class="${pnlCls}">${pnlFmt}</td>
+        <td class="pnl-pos">${peakFmt}</td>
+      </tr>`);
+  }
+
+  // Update UNTP PnL bar
+  const nrEl = document.getElementById('untp-bar-netr');
+  nrEl.textContent = (netR > 0 ? '+' : '') + netR.toFixed(2) + 'R';
+  nrEl.className   = 'pnl-bar-value ' + (netR > 0 ? 'pos' : netR < 0 ? 'neg' : 'neu');
+  document.getElementById('untp-bar-running').textContent = running;
+  document.getElementById('untp-bar-losses').textContent  = losses;
+  document.getElementById('untp-bar-bes').textContent     = bes;
+
+  const container = document.getElementById('untp-table-wrap');
+  if (!rows.length) {
+    container.innerHTML = '<div style="padding:32px;color:var(--muted);font-size:13px;text-align:center;">No trades with price data.</div>';
+    return;
+  }
+  container.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Symbol</th><th>Type</th><th>Entry Time</th>
+          <th>Outcome</th>
+          <th>MFE @ window</th><th>MAE @ window</th>
+          <th>PnL R</th><th>Peak MFE</th>
+        </tr>
+      </thead>
+      <tbody>${rows.join('')}</tbody>
+    </table>
+    <div class="table-footer">
+      <span>${rows.length} trade${rows.length !== 1 ? 's' : ''} · window: ${fmtDuration(_untpPageMins)}</span>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UNTP DRAWER
+// ═══════════════════════════════════════════════════════════════
+function openUntpDrawer(tradeId) {
+  const t = TRADES[tradeId];
+  if (!t) return;
+  _untpOpenTradeId = tradeId;
+
+  document.getElementById('ud-symbol').textContent =
+    t.symbol + ' · ' + t.trade_type.replace(/_/g, ' ');
+  document.getElementById('ud-meta').textContent =
+    localTime(t.entry_time) + ' · ' + (t.entry_session || '') + ' · ID #' + t.trade_id;
+
+  renderUntpDrawerContent(t);
+
+  document.getElementById('untpDrawerOverlay').classList.add('open');
+  document.getElementById('untpDrawer').classList.add('open');
+}
+
+function closeUntpDrawer() {
+  document.getElementById('untpDrawerOverlay').classList.remove('open');
+  document.getElementById('untpDrawer').classList.remove('open');
+  _untpOpenTradeId = null;
+}
+
+function renderUntpDrawerContent(t) {
+  const usePips = document.body.classList.contains('show-pips');
+  const slDist  = t.sl_distance_pips;
+  const dp = ['XAUUSD','NAS100','US30','USTEC','USOIL','UKOIL','XAGUSD'].includes(t.symbol)
+    || t.symbol.endsWith('JPY') ? 2 : 5;
+
+  // ── UNTP state at current window ──────────────────────────────
+  const w   = resolveUntpAtWindow(t, _untpPageMins);
+  const cls = classifyUntpTrade(t, _untpPageMins);
+
+  const peak   = untpPeakMfe(t);
+  const laIdx  = untpLastAliveIdx(t);
+  const peakAliveMins  = laIdx >= 0 ? UNTP_CP_MINS[laIdx]   : null;
+  const peakAliveLabel = laIdx >= 0 ? UNTP_CP_LABELS[laIdx] : '—';
+
+  // Window label
+  const windowLabel = w.fromPath
+    ? fmtDuration(w.resolvedMins) + ' (path)'
+    : fmtDuration(w.resolvedMins);
+
+  // ── Outcome hero ──────────────────────────────────────────────
+  let untpOcIcon, untpOcLabel, untpOcCls, untpPnl;
+  if (!cls) {
+    // No price data
+    untpOcIcon = '⚠️'; untpOcLabel = 'No price data'; untpOcCls = ''; untpPnl = null;
+  } else if (cls.bucket === 'running') {
+    untpPnl = cls.pnl;
+    if (untpPnl > 0)      { untpOcIcon = '📈'; untpOcLabel = 'Running — In Profit';   untpOcCls = 'pos'; }
+    else if (untpPnl < 0) { untpOcIcon = '📉'; untpOcLabel = 'Running — In Drawdown'; untpOcCls = 'neg'; }
+    else                  { untpOcIcon = '⏳'; untpOcLabel = 'Running — Flat';         untpOcCls = 'neu'; }
+  } else if (cls.bucket === 'be') {
+    untpPnl = 0.0; untpOcIcon = '⚖️'; untpOcLabel = 'Stopped at Breakeven'; untpOcCls = 'zero';
+  } else {
+    untpPnl = -1.0; untpOcIcon = '❌'; untpOcLabel = 'Stopped at Stop Loss'; untpOcCls = 'neg';
+  }
+  const pnlDisplay = untpPnl !== null
+    ? (untpPnl > 0 ? '+' : '') + untpPnl.toFixed(2) + 'R'
+    : '—';
+
+  // ── MFE / MAE at window ────────────────────────────────────────
+  const mfeAtW = w.mfe, maeAtW = w.mae;
+  const mfeFmt = mfeAtW !== null
+    ? (usePips && slDist
+        ? (mfeAtW >= 0 ? '+' : '') + (mfeAtW * slDist).toFixed(1) + ' pips'
+        : (mfeAtW >= 0 ? '+' : '') + mfeAtW.toFixed(3) + 'R')
+    : '—';
+  const maeFmt = maeAtW !== null
+    ? (usePips && slDist ? (maeAtW * slDist).toFixed(1) + ' pips' : maeAtW.toFixed(3) + 'R')
+    : '—';
+  const peakFmt = peak !== null
+    ? (usePips && slDist ? '+' + (peak * slDist).toFixed(1) + ' pips' : '+' + peak.toFixed(3) + 'R')
+    : '—';
+
+  // ── MFE : MAE at window ────────────────────────────────────────
+  const _ufMfe = mfeAtW ?? 0, _ufMae = maeAtW ?? 0;
+  let mfeMaeStr = '—', mfeMaeCls = '';
+  if (_ufMfe > 0 && _ufMae > 0) {
+    const r = _ufMfe / _ufMae;
+    mfeMaeStr = r.toFixed(2) + ' : 1';
+    mfeMaeCls = r >= 2 ? 'pos' : r >= 1 ? 'warn' : 'neg';
+  } else if (_ufMae === 0 && _ufMfe > 0) {
+    mfeMaeStr = '∞ : 1'; mfeMaeCls = 'pos';
+  }
+
+  // ── MFE Capture: pnl / peak × 100 ─────────────────────────────
+  let mfeCaptureStr = '—', mfeCaptureCls = '', mfeCaptureBar = 0, mfeCaptureSub = 'No data';
+  if (peak !== null && peak > 0 && untpPnl !== null) {
+    const raw  = (untpPnl / peak) * 100;
+    const cap  = Math.max(-100, Math.min(200, raw));
+    mfeCaptureBar = Math.max(0, Math.min(100, raw));
+    mfeCaptureStr = cap.toFixed(0) + '%';
+    mfeCaptureCls = cap >= 80 ? 'pos' : cap >= 30 ? 'warn' : 'neg';
+    mfeCaptureSub = cap >= 80
+      ? 'High — most of the peak UNTP move is reflected at this window'
+      : cap >= 30 ? 'Partial — more UNTP move available beyond this window'
+                 : 'Low — significant UNTP move still ahead at this window';
+  }
+
+  // ── MAE Pressure at window ─────────────────────────────────────
+  let maePct = null, maePctStr = '—', maePctCls = '', maePctBar = 0, maePctSub = 'No data';
+  if (maeAtW !== null) {
+    maePct    = Math.min(100, maeAtW * 100);
+    maePctBar = maePct;
+    maePctStr = maePct.toFixed(0) + '%';
+    maePctCls = maePct >= 80 ? 'neg' : maePct >= 50 ? 'warn' : 'pos';
+    maePctSub = maePct >= 80 ? 'High — UNTP walk came close to stop level'
+      : maePct >= 50 ? 'Moderate — meaningful adverse pressure'
+                     : 'Low — stop level was not seriously threatened';
+  }
+
+  // ── BE section (same structure as trade walk) ──────────────────
+  const beSection = t.breakeven_active ? `
+    <div class="d-section">
+      <div class="d-section-title">Breakeven</div>
+      <div class="be-triggered-badge ${t.breakeven_triggered ? 'yes' : 'no'}">
+        ${t.breakeven_triggered ? '✓ Triggered' : '— Not triggered'}
+      </div>
+      <div class="d-grid">
+        <div class="d-item">
+          <span class="d-item-label">BE Setting</span>
+          <span class="d-item-value">${t.breakeven_type === 'rr'
+            ? t.breakeven_value + 'R' : t.breakeven_value + ' pips'}</span>
+        </div>
+        ${t.breakeven_triggered ? `
+        <div class="d-item">
+          <span class="d-item-label">Triggered at</span>
+          <span class="d-item-value">${fmtDuration(t.breakeven_trigger_time_minutes)}</span>
+          <span style="font-size:11px;color:var(--muted);">${eventTime(t.entry_time, t.breakeven_trigger_time_minutes)}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">MFE at BE</span>
+          <span class="d-item-value pos">${usePips && slDist
+            ? (t.mfe_at_breakeven_pips !== null ? t.mfe_at_breakeven_pips.toFixed(1) + ' pips' : '—')
+            : (t.mfe_at_breakeven_r    !== null ? t.mfe_at_breakeven_r.toFixed(3)    + 'R'     : '—')
+          }</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">MFE after BE</span>
+          <span class="d-item-value acc">${usePips && slDist
+            ? (t.mfe_after_be_pips !== null ? t.mfe_after_be_pips.toFixed(1) + ' pips' : '—')
+            : (t.mfe_after_be_r    !== null ? t.mfe_after_be_r.toFixed(3)    + 'R'     : '—')
+          }</span>
+        </div>` : ''}
+      </div>
+    </div>` : '';
+
+  // ── Pending order section ──────────────────────────────────────
+  const isPending = ['limit_buy','limit_sell','stop_buy','stop_sell'].includes(t.trade_type);
+  const pendingSection = isPending ? `
+    <div class="d-section">
+      <div class="d-section-title">Pending Order</div>
+      <div class="d-grid">
+        <div class="d-item">
+          <span class="d-item-label">Limit Price</span>
+          <span class="d-item-value">${t.limit_price !== null ? t.limit_price.toFixed(dp) : '—'}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Triggered</span>
+          <span class="d-item-value ${t.pending_order_triggered ? 'pos' : 'neg'}">${
+            t.pending_order_triggered === null ? '—' : (t.pending_order_triggered ? 'Yes' : 'No')}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Wait</span>
+          <span class="d-item-value">${fmtDuration(t.pending_wait_minutes)}</span>
+        </div>
+      </div>
+    </div>` : '';
+
+  // ── R milestones (trade-walk timing, reference only) ───────────
+  const milestones = [
+    { label: '0.5R', mins: t.time_to_0_5r_minutes },
+    { label: '1.0R', mins: t.time_to_1r_minutes },
+    { label: '1.5R', mins: t.time_to_1_5r_minutes },
+    { label: '2.0R', mins: t.time_to_2r_minutes },
+    { label: '3.0R', mins: t.time_to_3r_minutes },
+    { label: '4.0R', mins: t.time_to_4r_minutes },
+    { label: '5.0R', mins: t.time_to_5r_minutes },
+  ].filter(m => m.mins !== null);
+  const _msMx = milestones.length ? Math.max(...milestones.map(m => m.mins)) : 1;
+  const milestonesHtml = milestones.length > 0
+    ? milestones.map(m => `
+      <div class="milestone-item">
+        <span class="milestone-label">${m.label}</span>
+        <div class="milestone-bar-wrap">
+          <div class="milestone-bar" style="width:${(m.mins/_msMx*100).toFixed(0)}%"></div>
+        </div>
+        <span class="milestone-time">${fmtDuration(m.mins)}</span>
+      </div>`).join('')
+    : '<span style="color:var(--muted);font-size:12px;">No R milestones reached</span>';
+
+  // ── BUILD HTML ─────────────────────────────────────────────────
+  document.getElementById('untp-drawer-body').innerHTML = `
+
+    <!-- OUTCOME HERO -->
+    <div class="d-section">
+      <div class="d-outcome-hero">
+        <span class="d-outcome-icon">${untpOcIcon}</span>
+        <div>
+          <div class="d-outcome-label">${untpOcLabel}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">
+            Window: ${windowLabel}
+          </div>
+        </div>
+        <span class="d-outcome-pnl ${untpOcCls}">${pnlDisplay}</span>
+      </div>
+    </div>
+
+    <!-- UNTP PEAK (always shown, independent of window) -->
+    <div class="d-section">
+      <div class="d-section-title">UNTP Peak — All Time</div>
+      <div class="d-grid">
+        <div class="d-item">
+          <span class="d-item-label">Peak MFE</span>
+          <span class="d-item-value pos">${peakFmt}</span>
+          <span style="font-size:11px;color:var(--muted);">Max favourable across all checkpoints</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Alive Until</span>
+          <span class="d-item-value acc">${laIdx >= 0
+            ? fmtDuration(peakAliveMins) + ' · ' + peakAliveLabel
+            : '—'}</span>
+          <span style="font-size:11px;color:var(--muted);">Last checkpoint UNTP walk was running</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- UNTP @ WINDOW -->
+    <div class="d-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div class="d-section-title" style="margin-bottom:0;">UNTP @ Window</div>
+        <span style="font-size:10px;color:var(--accent2);background:var(--surface2);
+                     border:1px solid var(--border);border-radius:4px;padding:2px 7px;">
+          ${windowLabel}
+        </span>
+      </div>
+      <div class="d-grid-3" style="margin-bottom:10px;">
+        <div class="d-item">
+          <span class="d-item-label">MFE</span>
+          <span class="d-item-value ${mfeAtW !== null ? (mfeAtW >= 0 ? 'pos' : 'neg') : ''}">${mfeFmt}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">MAE</span>
+          <span class="d-item-value neg">${maeFmt}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">MFE : MAE</span>
+          <span class="d-item-value ${mfeMaeCls}">${mfeMaeStr}</span>
+        </div>
+      </div>
+      <div class="analysis-card" style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <div class="analysis-label">MFE Capture</div>
+          <div class="analysis-value ${mfeCaptureCls}" style="font-size:15px;">${mfeCaptureStr}</div>
+        </div>
+        <div class="fill-bar-wrap">
+          <div class="fill-bar" style="width:${mfeCaptureBar.toFixed(0)}%;background:${
+            mfeCaptureStr === '—' ? 'var(--border)' :
+            mfeCaptureBar >= 80  ? 'var(--success)' :
+            mfeCaptureBar >= 30  ? 'var(--warn)'    : 'var(--danger)'};"></div>
+        </div>
+        <div class="analysis-sub" style="margin-top:4px;">${mfeCaptureSub}</div>
+      </div>
+      <div class="analysis-card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <div class="analysis-label">MAE Pressure</div>
+          <div class="analysis-value ${maePctCls}" style="font-size:15px;">${maePct !== null ? maePctStr + ' of SL' : '—'}</div>
+        </div>
+        <div class="fill-bar-wrap">
+          <div class="fill-bar" style="width:${maePctBar.toFixed(0)}%;background:${
+            maePct === null   ? 'var(--border)' :
+            maePct >= 80      ? 'var(--danger)' :
+            maePct >= 50      ? 'var(--warn)'   : 'var(--success)'};"></div>
+        </div>
+        <div class="analysis-sub" style="margin-top:4px;">${maePctSub}</div>
+      </div>
+    </div>
+
+    <!-- ENTRY GEOMETRY -->
+    <div class="d-section">
+      <div class="d-section-title">Entry Geometry</div>
+      <div class="d-grid">
+        <div class="d-item">
+          <span class="d-item-label">Entry Price</span>
+          <span class="d-item-value">${t.entry_price !== null ? t.entry_price.toFixed(dp) : '—'}</span>
+          <span style="font-size:11px;color:var(--muted);">${localTime(t.entry_time)}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Stop Loss</span>
+          <span class="d-item-value neg">${t.stoploss_price !== null ? t.stoploss_price.toFixed(dp) : '—'}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Take Profit</span>
+          <span class="d-item-value pos">${t.takeprofit_price !== null ? t.takeprofit_price.toFixed(dp) : '—'}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">SL Distance</span>
+          <span class="d-item-value">${slDist !== null ? slDist.toFixed(1) + ' pips' : '—'}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">TP Target</span>
+          <span class="d-item-value">${t.tp_rr_target !== null ? t.tp_rr_target.toFixed(2) + 'R' : '—'}${
+            t.tp_pips_target !== null ? ' · ' + t.tp_pips_target.toFixed(1) + 'p' : ''}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Trade Outcome</span>
+          <span class="d-item-value dim">${t.outcome_at_user_tp || '—'}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- R MILESTONES (trade walk, for reference) -->
+    <div class="d-section">
+      <div class="d-section-title">R Milestone Timing (Trade Walk)</div>
+      <div class="milestone-list">${milestonesHtml}</div>
+    </div>
+
+    <!-- BE (conditional) -->
+    ${beSection}
+
+    <!-- PENDING ORDER (conditional) -->
+    ${pendingSection}
+
+    <!-- UNTP NOTES -->
+    <div class="d-section">
+      <div class="d-section-title">UNTP Notes</div>
+      <div class="notes-edit-wrap">
+        <textarea class="notes-textarea" id="ud-notes-ta"
+                  placeholder="Add UNTP notes…">${esc(t.untp_notes || '')}</textarea>
+        <div style="display:flex;align-items:center;margin-top:8px;">
+          <button class="notes-save-btn" onclick="saveUntpNotes(${t.trade_id})">Save notes</button>
+          <span class="notes-save-status" id="ud-notes-status">✓ Saved</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- DATA -->
+    <div class="d-section">
+      <div class="d-section-title">Data</div>
+      <div class="d-grid">
+        <div class="d-item">
+          <span class="d-item-label">Price Path Captured</span>
+          <span class="d-item-value ${t.price_path_captured ? 'pos' : 'neg'}">${t.price_path_captured ? 'Yes' : 'No ⚠'}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Saved At</span>
+          <span class="d-item-value dim">${t.saved_at || '—'}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function saveUntpNotes(tradeId) {
+  const text = document.getElementById('ud-notes-ta').value;
+  const fd = new FormData();
+  fd.append('notes', text);
+  try {
+    const r = await fetch('/trades/' + tradeId + '/untp-notes', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (d.success) {
+      if (TRADES[tradeId]) TRADES[tradeId].untp_notes = text;
+      const status = document.getElementById('ud-notes-status');
+      status.classList.add('visible');
+      setTimeout(() => status.classList.remove('visible'), 2000);
+    } else {
+      toast(d.error || 'Failed to save UNTP notes.', 'error');
+    }
+  } catch {
+    toast('Network error saving UNTP notes.', 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TRADE WALK DRAWER
+// ═══════════════════════════════════════════════════════════════
+function openDrawer(tradeId) {
+  const t = TRADES[tradeId];
+  if (!t) return;
+  _openTradeId = tradeId;
+
+  document.querySelectorAll('#trade-tbody tr').forEach(r => r.classList.remove('selected'));
+  document.getElementById('row-' + tradeId)?.classList.add('selected');
+
+  document.getElementById('d-symbol').textContent =
+    t.symbol + ' · ' + t.trade_type.replace(/_/g, ' ');
+  document.getElementById('d-meta').textContent =
+    localTime(t.entry_time) + ' · ' + (t.entry_session || '') + ' · ID #' + t.trade_id;
+
+  renderDrawerContent(t);
+
+  document.getElementById('drawerOverlay').classList.add('open');
+  document.getElementById('tradeDrawer').classList.add('open');
+}
+
+function closeDrawer() {
+  document.getElementById('drawerOverlay').classList.remove('open');
+  document.getElementById('tradeDrawer').classList.remove('open');
+  document.querySelectorAll('#trade-tbody tr').forEach(r => r.classList.remove('selected'));
+  _openTradeId = null;
+}
+
+function renderDrawerContent(t) {
+  const usePips = document.body.classList.contains('show-pips');
+
+  // ── Outcome hero ───────────────────────────────────────────
+  const outcomeMap = {
+    hit_tp: { icon: '✅', label: 'Hit Take Profit', cls: 'pos' },
+    hit_sl: { icon: '❌', label: 'Hit Stop Loss',   cls: 'neg' },
+    hit_be: { icon: '⚖️', label: 'Breakeven',       cls: 'zero' },
+    open:   { icon: '⏳', label: 'Still Open',      cls: 'acc' },
+    none:   { icon: '—',  label: 'No TP Set',       cls: '' },
+  };
+  const oc  = outcomeMap[t.outcome_at_user_tp] || outcomeMap['none'];
+  const pnlDisplay = t.pnl_r !== null
+    ? (t.pnl_r > 0 ? '+' : '') + t.pnl_r.toFixed(2) + 'R'
+    : '—';
+
+  const dp = ['XAUUSD','NAS100','US30','USTEC','USOIL','UKOIL','XAGUSD'].includes(t.symbol)
+    || t.symbol.endsWith('JPY') ? 2 : 5;
+
+  // ── MFE / MAE display vars removed — Excursion section moved to UNTP drawer ──
+
+  // ── R milestone bars ──────────────────────────────────────
+  const milestones = [
+    { label: '0.5R', mins: t.time_to_0_5r_minutes },
+    { label: '1.0R', mins: t.time_to_1r_minutes   },
+    { label: '1.5R', mins: t.time_to_1_5r_minutes },
+    { label: '2.0R', mins: t.time_to_2r_minutes   },
+    { label: '3.0R', mins: t.time_to_3r_minutes   },
+    { label: '4.0R', mins: t.time_to_4r_minutes   },
+    { label: '5.0R', mins: t.time_to_5r_minutes   },
+  ].filter(m => m.mins !== null);
+  const maxMins = milestones.length ? Math.max(...milestones.map(m => m.mins)) : 1;
+  const milestonesHtml = milestones.length > 0
+    ? milestones.map(m => `
+      <div class="milestone-item">
+        <span class="milestone-label">${m.label}</span>
+        <div class="milestone-bar-wrap">
+          <div class="milestone-bar" style="width:${(m.mins/maxMins*100).toFixed(0)}%"></div>
+        </div>
+        <span class="milestone-time">${fmtDuration(m.mins)}</span>
+      </div>`).join('')
+    : '<span style="color:var(--muted);font-size:12px;">No R milestones reached</span>';
+
+  // ── BE section ─────────────────────────────────────────────
+  const beSection = t.breakeven_active ? `
+    <div class="d-section">
+      <div class="d-section-title">Breakeven</div>
+      <div class="be-triggered-badge ${t.breakeven_triggered ? 'yes' : 'no'}">
+        ${t.breakeven_triggered ? '✓ Triggered' : '— Not triggered'}
+      </div>
+      <div class="d-grid">
+        <div class="d-item">
+          <span class="d-item-label">BE Setting</span>
+          <span class="d-item-value">${t.breakeven_type === 'rr'
+            ? t.breakeven_value + 'R' : t.breakeven_value + ' pips'}</span>
+        </div>
+        ${t.breakeven_triggered ? `
+        <div class="d-item">
+          <span class="d-item-label">Triggered at</span>
+          <span class="d-item-value">${fmtDuration(t.breakeven_trigger_time_minutes)}</span>
+          <span style="font-size:11px;color:var(--muted);">${eventTime(t.entry_time, t.breakeven_trigger_time_minutes)}</span>
+        </div>` : ''}
+      </div>
+    </div>` : '';
+
+  // ── Pending section ────────────────────────────────────────
+  const isPending = ['limit_buy','limit_sell','stop_buy','stop_sell'].includes(t.trade_type);
+  const pendingSection = isPending ? `
+    <div class="d-section">
+      <div class="d-section-title">Pending Order</div>
+      <div class="d-grid">
+        <div class="d-item">
+          <span class="d-item-label">Limit Price</span>
+          <span class="d-item-value">${t.limit_price !== null ? t.limit_price.toFixed(dp) : '—'}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Triggered</span>
+          <span class="d-item-value ${t.pending_order_triggered ? 'pos' : 'neg'}">${
+            t.pending_order_triggered === null ? '—' : (t.pending_order_triggered ? 'Yes' : 'No')}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Fill Time</span>
+          <span class="d-item-value">${t.pending_trigger_time ? localTime(t.pending_trigger_time) : '—'}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Wait</span>
+          <span class="d-item-value">${fmtDuration(t.pending_wait_minutes)}</span>
+        </div>
+      </div>
+    </div>` : '';
+
+  // ── Streak / session ───────────────────────────────────────
+  const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const streakVal = t.channel_streak_at_save;
+  const _outcome  = t.outcome_at_user_tp;
+  const _streakIsNeutral = (_outcome === 'open' || _outcome === 'none' || _outcome === 'hit_be');
+  const streakDisplay = streakVal === null ? '—'
+    : _streakIsNeutral
+      ? (streakVal !== 0
+          ? `${streakVal > 0 ? '+' : ''}${streakVal} (prior, not counted)`
+          : '0 at save')
+      : streakVal > 0 ? `+${streakVal} (${streakVal}W streak)`
+      : streakVal < 0 ? `${streakVal} (${Math.abs(streakVal)}L streak)`
+      : 'First trade / reset';
+
+  // ── Trade Analysis (UNTP-based reference) ─────────────────
+  const ref         = resolveUntpRef(t);
+  const _refMfe     = ref.mfe ?? 0;
+  const _refMae     = ref.mae ?? 0;
+  const _refStopped = ref.stopped;
+  const _dip        = t.dip_occurred;
+  const _advCandles = t.consecutive_adverse_candles ?? 0;
+
+  // Trade Shape
+  let shapeName = 'Choppy', shapeCls = 'shape-choppy', shapeIcon = '〰';
+  let shapeDesc = 'Mixed signals — significant adverse pressure relative to favourable move.';
+  if (_outcome === 'hit_sl' && _refMfe < 0.35) {
+    shapeName = 'Stopped-clean'; shapeCls = 'shape-stopped-clean';
+    shapeIcon = '⛔'; shapeDesc = 'Price moved straight to SL with little or no favourable excursion.';
+  } else if (!_dip && _advCandles <= 1 && _refMae < 0.35) {
+    shapeName = 'Clean'; shapeCls = 'shape-clean';
+    shapeIcon = '→'; shapeDesc = 'Minimal adverse pressure — price moved in your favour from the start.';
+  } else if (_dip && _outcome === 'hit_tp') {
+    shapeName = 'Dip-then-run'; shapeCls = 'shape-dip-run';
+    shapeIcon = '↓↑'; shapeDesc = 'Price dipped against you first, recovered and hit TP.';
+  }
+
+  // MFE Utilisation
+  let mfeUtil = null, mfeUtilStr = '—', mfeUtilCls = '', mfeUtilBar = 0;
+  let mfeUtilSub = _refStopped ? 'UNTP walk stopped before this window' : 'No data';
+  if (_refMfe > 0 && t.pnl_r !== null) {
+    mfeUtil    = Math.max(0, Math.min(100, (t.pnl_r / _refMfe) * 100));
+    mfeUtilBar = mfeUtil;
+    mfeUtilStr = mfeUtil.toFixed(0) + '%';
+    mfeUtilCls = mfeUtil >= 80 ? 'pos' : mfeUtil >= 45 ? 'warn' : 'neg';
+    mfeUtilSub = mfeUtil >= 80
+      ? 'Excellent — captured most of the available move'
+      : mfeUtil >= 45 ? 'Moderate — meaningful R available beyond your exit'
+                      : 'Low — price moved much further than your exit captured';
+  }
+
+  // MFE : MAE ratio (trade walk — R5: use t.mae_r for hit_tp)
+  const _ratioMae = (_outcome === 'hit_tp') ? (t.mae_r ?? 0) : _refMae;
+  let mfeMaeRatio = null, mfeMaeRatioStr = '—', mfeMaeRatioCls = '';
+  if (_refMfe > 0 && _ratioMae > 0) {
+    mfeMaeRatio    = _refMfe / _ratioMae;
+    mfeMaeRatioStr = mfeMaeRatio.toFixed(2) + ' : 1';
+    mfeMaeRatioCls = mfeMaeRatio >= 2 ? 'pos' : mfeMaeRatio >= 1 ? 'warn' : 'neg';
+  } else if (_ratioMae === 0 && _refMfe > 0) {
+    mfeMaeRatioStr = '∞ : 1'; mfeMaeRatioCls = 'pos';
+  }
+
+  // Exit Efficiency
+  let exitLabel = '—', exitStr = '—', exitCls = '', exitSub = '', exitBar = 0, exitValue = null;
+  if (_refMfe > 0.05 && t.pnl_r !== null) {
+    const gave = _refMfe - t.pnl_r;
+    exitValue = gave;
+    exitBar   = Math.min(100, Math.max(0, (gave / _refMfe) * 100));
+    if (_outcome === 'hit_tp') {
+      exitLabel = 'Left on Table';
+      exitStr   = gave < 0.01 ? '~0R' : '+' + gave.toFixed(2) + 'R';
+      exitCls   = gave < 0.15 ? 'pos' : gave < 0.5 ? 'warn' : 'neg';
+      exitSub   = gave < 0.1
+        ? 'TP was near the peak — minimal R left behind'
+        : `Price reached ${_refMfe.toFixed(2)}R (${ref.label}) — TP captured ${t.pnl_r.toFixed(2)}R`;
+    } else if (_outcome === 'hit_sl') {
+      exitLabel = 'Gave Back';
+      exitStr   = _refMfe.toFixed(2) + 'R → lost 1R';
+      exitCls   = 'neg';
+      exitSub   = `Had ${_refMfe.toFixed(2)}R in favour (${ref.label}) before SL hit`;
+    } else if (_outcome === 'hit_be') {
+      exitLabel = 'Gave Back (to BE)';
+      exitStr   = _refMfe.toFixed(2) + 'R';
+      exitCls   = 'warn';
+      exitSub   = `Had ${_refMfe.toFixed(2)}R available, closed at entry`;
+    }
+  } else if (t.pnl_r !== null) {
+    exitLabel = _outcome === 'hit_sl' ? 'Gave Back' : 'Left on Table';
+    exitStr = '~0R'; exitCls = 'dim';
+    exitSub = 'Negligible favourable move before exit';
+  }
+
+  // MAE Pressure (trade walk mae_r — R key distinction)
+  let maePct = null, maePctStr = '—', maePctCls = '', maePctBar = 0;
+  let maePctSub = 'No data';
+  if (t.mae_r !== null) {
+    maePct    = Math.min(100, t.mae_r * 100);
+    maePctBar = maePct;
+    maePctStr = maePct.toFixed(0) + '% of SL';
+    maePctCls = maePct >= 80 ? 'neg' : maePct >= 50 ? 'warn' : 'pos';
+    maePctSub = maePct >= 80 ? 'High — price came close to stopping you out'
+      : maePct >= 50 ? 'Moderate — meaningful heat taken before resolution'
+                     : 'Low — SL was never seriously threatened';
+  }
+
+  // First Move
+  const firstMoveMap = {
+    favour:  { label: '▲ In your favour', cls: 'pos' },
+    against: { label: '▼ Against you',    cls: 'neg' },
+    neutral: { label: '→ Neutral',        cls: 'dim' },
+  };
+  const firstMove = firstMoveMap[t.first_candle_direction] || { label: '—', cls: 'dim' };
+
+  // Time at Risk
+  const timeAtRisk = t.time_to_resolution_minutes !== null
+    ? fmtDuration(t.time_to_resolution_minutes)
+    : (_outcome === 'open' || _outcome === 'none' ? 'Still open' : '—');
+
+  const refLabel = _refStopped ? `UNTP stopped @ ${ref.label}` : `UNTP ${ref.label}`;
+
+  // ── BUILD HTML ─────────────────────────────────────────────
+  document.getElementById('drawer-body').innerHTML = `
+
+    <!-- OUTCOME HERO -->
+    <div class="d-section">
+      <div class="d-outcome-hero">
+        <span class="d-outcome-icon">${oc.icon}</span>
+        <div>
+          <div class="d-outcome-label">${oc.label}</div>
+          ${t.time_to_resolution_minutes !== null
+            ? `<div style="font-size:12px;color:var(--muted);margin-top:2px;">
+                 Resolved in ${fmtDuration(t.time_to_resolution_minutes)} · ${t.candles_to_resolution ?? '—'} candles
+                 <span style="margin-left:6px;opacity:.7;">@ ${eventTime(t.entry_time, t.time_to_resolution_minutes)}</span>
+               </div>`
+            : ''}
+        </div>
+        <span class="d-outcome-pnl ${oc.cls}">${pnlDisplay}</span>
+      </div>
+    </div>
+
+    <!-- TRADE ANALYSIS -->
+    <div class="d-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div class="d-section-title" style="margin-bottom:0;">Trade Analysis</div>
+        <span style="font-size:10px;color:${_refStopped ? 'var(--warn)' : 'var(--accent2)'};
+                     background:var(--surface2);border:1px solid var(--border);
+                     border-radius:4px;padding:2px 7px;">
+          ${refLabel}
+        </span>
+      </div>
+      <div class="analysis-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:10px;">
+        <div class="analysis-card" style="grid-column:span 3;display:flex;align-items:center;gap:12px;padding:10px 14px;">
+          <span class="shape-badge ${shapeCls}">${shapeIcon} ${shapeName}</span>
+          <span class="shape-desc" style="margin-top:0;">${shapeDesc}</span>
+        </div>
+        <div class="analysis-card">
+          <div class="analysis-label">First Move</div>
+          <div class="analysis-value ${firstMove.cls}" style="font-size:13px;">${firstMove.label}</div>
+          <div class="analysis-sub">First candle direction</div>
+        </div>
+        <div class="analysis-card">
+          <div class="analysis-label">Time at Risk</div>
+          <div class="analysis-value">${timeAtRisk}</div>
+          <div class="analysis-sub">Capital deployed</div>
+        </div>
+        <div class="analysis-card">
+          <div class="analysis-label">MFE : MAE</div>
+          <div class="analysis-value ${mfeMaeRatioCls}">${mfeMaeRatioStr}</div>
+          <div class="analysis-sub">Favour vs adverse</div>
+        </div>
+      </div>
+      <div class="analysis-card" style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <div class="analysis-label">MFE Utilisation</div>
+          <div class="analysis-value ${mfeUtilCls}" style="font-size:15px;">${mfeUtilStr}</div>
+        </div>
+        <div class="fill-bar-wrap">
+          <div class="fill-bar" style="width:${mfeUtilBar.toFixed(0)}%;background:${
+            mfeUtil === null ? 'var(--border)' :
+            mfeUtil >= 80 ? 'var(--success)' :
+            mfeUtil >= 45 ? 'var(--warn)' : 'var(--danger)'};"></div>
+        </div>
+        <div class="analysis-sub" style="margin-top:4px;">${mfeUtilSub}</div>
+      </div>
+      <div class="analysis-card" style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <div class="analysis-label">${exitLabel}</div>
+          <div class="analysis-value ${exitCls}" style="font-size:15px;">${exitStr}</div>
+        </div>
+        ${exitValue !== null && _refMfe > 0.05 ? `
+        <div class="fill-bar-wrap">
+          <div class="fill-bar" style="width:${exitBar.toFixed(0)}%;background:${
+            exitBar < 10 ? 'var(--success)' :
+            exitBar < 40 ? 'var(--warn)' : 'var(--danger)'};"></div>
+        </div>` : ''}
+        <div class="analysis-sub" style="margin-top:4px;">${exitSub}</div>
+      </div>
+      <div class="analysis-card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <div class="analysis-label">MAE Pressure</div>
+          <div class="analysis-value ${maePctCls}" style="font-size:15px;">${maePctStr}</div>
+        </div>
+        <div class="fill-bar-wrap">
+          <div class="fill-bar" style="width:${maePctBar.toFixed(0)}%;background:${
+            maePct === null ? 'var(--border)' :
+            maePct >= 80 ? 'var(--danger)' :
+            maePct >= 50 ? 'var(--warn)' : 'var(--success)'};"></div>
+        </div>
+        <div class="analysis-sub" style="margin-top:4px;">${maePctSub}</div>
+      </div>
+    </div>
+
+    <!-- ENTRY GEOMETRY -->
+    <div class="d-section">
+      <div class="d-section-title">Entry Geometry</div>
+      <div class="d-grid">
+        <div class="d-item">
+          <span class="d-item-label">Entry Price</span>
+          <span class="d-item-value">${t.entry_price !== null ? t.entry_price.toFixed(dp) : '—'}</span>
+          <span style="font-size:11px;color:var(--muted);">${localTime(t.entry_time)}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Exit Price</span>
+          <span class="d-item-value">${t.exit_price !== null ? t.exit_price.toFixed(dp) : '—'}</span>
+          <span style="font-size:11px;color:var(--muted);">${eventTime(t.entry_time, t.time_to_resolution_minutes)}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Stop Loss</span>
+          <span class="d-item-value neg">${t.stoploss_price !== null ? t.stoploss_price.toFixed(dp) : '—'}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Take Profit</span>
+          <span class="d-item-value pos">${t.takeprofit_price !== null ? t.takeprofit_price.toFixed(dp) : '—'}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">SL Distance</span>
+          <span class="d-item-value">${t.sl_distance_pips !== null ? t.sl_distance_pips.toFixed(1) + ' pips' : '—'}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">TP Target</span>
+          <span class="d-item-value">${t.tp_rr_target !== null ? t.tp_rr_target.toFixed(2) + 'R' : '—'}${
+            t.tp_pips_target !== null ? ' · ' + t.tp_pips_target.toFixed(1) + 'p' : ''}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Input Type</span>
+          <span class="d-item-value dim">${t.input_type || '—'}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- R MILESTONES -->
+    <div class="d-section">
+      <div class="d-section-title">R Milestone Timing</div>
+      <div class="milestone-list">${milestonesHtml}</div>
+    </div>
+
+    <!-- BE (conditional) -->
+    ${beSection}
+
+    <!-- PENDING ORDER (conditional) -->
+    ${pendingSection}
+
+    <!-- ENTRY QUALITY -->
+    <div class="d-section">
+      <div class="d-section-title">Entry Quality & Context</div>
+      <div class="d-grid">
+        <div class="d-item">
+          <span class="d-item-label">First Candle</span>
+          <span class="d-item-value ${t.first_candle_direction === 'favour' ? 'pos' : (t.first_candle_direction === 'against' ? 'neg' : '')}">
+            ${t.first_candle_direction || '—'}
+          </span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Adverse Candles</span>
+          <span class="d-item-value">${t.consecutive_adverse_candles !== null ? t.consecutive_adverse_candles : '—'}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Avg Candle Size</span>
+          <span class="d-item-value">${t.avg_candle_size_pips_at_entry !== null ? t.avg_candle_size_pips_at_entry.toFixed(1) + ' pips' : '—'}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Session</span>
+          <span class="d-item-value dim">${t.entry_session || '—'}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Day</span>
+          <span class="d-item-value dim">${t.entry_day_of_week !== null ? DAYS[t.entry_day_of_week] : '—'}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Hour (UTC)</span>
+          <span class="d-item-value dim">${t.entry_hour !== null ? t.entry_hour + ':00' : '—'}</span>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="d-item">
+          <span class="d-item-label">Channel Streak at Save</span>
+          <span class="d-item-value ${streakVal > 0 ? 'pos' : (streakVal < 0 ? 'neg' : 'dim')}">${streakDisplay}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- NOTES -->
+    <div class="d-section">
+      <div class="d-section-title">Notes</div>
+      <div class="notes-edit-wrap">
+        <textarea class="notes-textarea" id="d-notes-ta" placeholder="Add notes…">${esc(t.notes || '')}</textarea>
+        <div style="display:flex;align-items:center;margin-top:8px;">
+          <button class="notes-save-btn" onclick="saveNotes(${t.trade_id})">Save notes</button>
+          <span class="notes-save-status" id="notes-status">✓ Saved</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- DATA QUALITY -->
+    <div class="d-section">
+      <div class="d-section-title">Data</div>
+      <div class="d-grid">
+        <div class="d-item">
+          <span class="d-item-label">Price Path Captured</span>
+          <span class="d-item-value ${t.price_path_captured ? 'pos' : 'neg'}">${t.price_path_captured ? 'Yes' : 'No ⚠'}</span>
+        </div>
+        <div class="d-item">
+          <span class="d-item-label">Saved At</span>
+          <span class="d-item-value dim">${t.saved_at || '—'}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function saveNotes(tradeId) {
+  const text = document.getElementById('d-notes-ta').value;
+  const fd = new FormData();
+  fd.append('notes', text);
+  try {
+    const r = await fetch('/trades/' + tradeId + '/notes', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (d.success) {
+      if (TRADES[tradeId]) TRADES[tradeId].notes = text;
+      const cell = document.querySelector('#row-' + tradeId + ' .notes-cell');
+      if (cell) { cell.textContent = text || ''; cell.title = text || ''; }
+      const status = document.getElementById('notes-status');
+      status.classList.add('visible');
+      setTimeout(() => status.classList.remove('visible'), 2000);
+    } else {
+      toast(d.error || 'Failed to save notes.', 'error');
+    }
+  } catch {
+    toast('Network error saving notes.', 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DRAWER ACTIONS
+// ═══════════════════════════════════════════════════════════════
+function drawerMove()   { if (_openTradeId) openMoveModal(Number(_openTradeId)); }
+function drawerDelete() { if (_openTradeId) confirmDelete(Number(_openTradeId)); }
+
+// ═══════════════════════════════════════════════════════════════
+// EVENT DELEGATION — row clicks + action buttons
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('click', e => {
+  const actionBtn = e.target.closest('[data-action="move"], [data-action="del"]');
+  if (actionBtn) {
+    const action  = actionBtn.dataset.action;
+    const tradeId = parseInt(actionBtn.dataset.tradeId, 10);
+    if (action === 'move') openMoveModal(tradeId);
+    if (action === 'del')  confirmDelete(tradeId);
+    return;
+  }
+  const row = e.target.closest('tr[data-action="open-drawer"]');
+  if (row) { openDrawer(row.dataset.tradeId); return; }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// MODAL HELPERS
+// ═══════════════════════════════════════════════════════════════
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeDrawer();
+    closeUntpDrawer();
+    ['deleteModal','moveModal'].forEach(closeModal);
+  }
+});
+
+['deleteModal','moveModal'].forEach(id => {
+  document.getElementById(id).addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal(id);
+  });
+});
+
+document.getElementById('drawerOverlay').addEventListener('click', closeDrawer);
+document.getElementById('untpDrawerOverlay').addEventListener('click', closeUntpDrawer);
+
+// ═══════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = 'toast-item ' + type;
+  el.textContent = msg;
+  document.getElementById('toast').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DELETE
+// ═══════════════════════════════════════════════════════════════
+function confirmDelete(tradeId) {
+  _deleteTradeId = tradeId;
+  openModal('deleteModal');
+  document.getElementById('delete-confirm-btn').onclick = submitDelete;
+}
+
+async function submitDelete() {
+  try {
+    const r = await fetch('/trades/' + _deleteTradeId + '/delete', { method: 'POST' });
+    const d = await r.json();
+    if (d.success) {
+      closeModal('deleteModal');
+      closeDrawer();
+      document.getElementById('row-' + _deleteTradeId)?.remove();
+      delete TRADES[_deleteTradeId];
+      toast('🗑 Trade deleted');
+      updateCount();
+      ensureEmptyRow();
+    } else {
+      toast(d.error || 'Failed to delete trade.', 'error');
+    }
+  } catch {
+    toast('Network error — please try again.', 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MOVE
+// ═══════════════════════════════════════════════════════════════
+function openMoveModal(tradeId) {
+  _moveTradeId = tradeId;
+  if (PAGE.hasChannels) { openModal('moveModal'); }
+  else { toast('No other channels to move to.', 'error'); }
+}
+
+async function submitMove() {
+  const channelId = document.getElementById('move-channel-select').value;
+  const fd = new FormData();
+  fd.append('channel_id', channelId);
+  try {
+    const r = await fetch('/trades/' + _moveTradeId + '/move', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (d.success) {
+      closeModal('moveModal');
+      closeDrawer();
+      document.getElementById('row-' + _moveTradeId)?.remove();
+      delete TRADES[_moveTradeId];
+      toast('✅ Trade moved');
+      updateCount();
+      ensureEmptyRow();
+    } else {
+      toast(d.error || 'Failed to move trade.', 'error');
+    }
+  } catch {
+    toast('Network error — please try again.', 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FILTERS
+// ═══════════════════════════════════════════════════════════════
+function applyFilters() {
+  const params = new URLSearchParams();
+  const symbol    = document.getElementById('f-symbol').value;
+  const tradeType = document.getElementById('f-trade-type').value;
+  const outcome   = document.getElementById('f-outcome').value;
+  const dateFrom  = document.getElementById('f-date-from').value;
+  const dateTo    = document.getElementById('f-date-to').value;
+  if (symbol    !== 'all') params.set('symbol',     symbol);
+  if (tradeType !== 'all') params.set('trade_type', tradeType);
+  if (outcome   !== 'all') params.set('outcome',    outcome);
+  if (dateFrom)            params.set('date_from',  dateFrom);
+  if (dateTo)              params.set('date_to',    dateTo);
+  const qs = params.toString();
+  window.location.href = '/channels/' + PAGE.channelId + (qs ? '?' + qs : '');
+}
+
+function resetFilters() {
+  window.location.href = '/channels/' + PAGE.channelId;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COUNT + EMPTY ROW
+// ═══════════════════════════════════════════════════════════════
+function updateCount() {
+  const rows  = document.querySelectorAll('#trade-tbody tr:not(.empty-row)');
+  const label = document.getElementById('count-label');
+  if (!label) return;
+  const n          = rows.length;
+  const isFiltered = label.dataset.filtered === 'true';
+  label.textContent = n + ' trade' + (n !== 1 ? 's' : '') + (isFiltered ? ' (filtered)' : '');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KEYBOARD NAVIGATION (← → to step through trades in TP drawer)
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (!_openTradeId) return;
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') return;
+  const rows = Array.from(document.querySelectorAll('#trade-tbody tr[data-trade-id]'));
+  const idx  = rows.findIndex(r => r.dataset.tradeId === String(_openTradeId));
+  if (idx === -1) return;
+  const next = e.key === 'ArrowRight' ? idx + 1 : idx - 1;
+  if (next < 0 || next >= rows.length) return;
+  e.preventDefault();
+  openDrawer(rows[next].dataset.tradeId);
+});
+
+function ensureEmptyRow() {
+  const tbody    = document.getElementById('trade-tbody');
+  const dataRows = tbody.querySelectorAll('tr:not(.empty-row)');
+  if (dataRows.length === 0 && !tbody.querySelector('.empty-row')) {
+    const tr = document.createElement('tr');
+    tr.className = 'empty-row';
+    const td = document.createElement('td');
+    td.setAttribute('colspan', PAGE.tableCols);
+    td.textContent = 'No trades match your filters.';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  }
+}
+</script>
+</body>
+</html>

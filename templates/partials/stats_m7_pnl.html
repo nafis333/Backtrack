@@ -1,0 +1,320 @@
+{#
+  partials/stats_m7_pnl.html
+  ───────────────────────────
+  Module 7 — PnL Report
+  Phase 5
+
+  Always uses pnl_r directly (R2). Ignores TP mode/unit/time-limit.
+  Filters (channel, date, symbol, trade_type) applied server-side via _load_trades.
+
+  Sections:
+    1. Summary cards — Net RR, Evaluated, Win Streak, Loss Streak
+    2. Equity curve chart
+    3. Monthly totals table
+    4. Weekly totals table (PR8: zero-trade weeks shown as 0.0)
+    5. Per-symbol table
+
+  JS entry point: renderPnlReport(d) — called by runStatistics() in shell.
+  State: lastPnlData — stored for tab revisit without re-fetch.
+  Charts: pnlEqChart — destroyed/recreated on each render.
+#}
+
+<div class="tab-pane" id="tab-pnl">
+
+  <div class="empty-state" id="pnl-empty-state">
+    <div class="empty-icon">◈</div>
+    <div class="empty-title">Run statistics to see the PnL report</div>
+    <div class="empty-sub">Uses actual pnl_r for all calculations. TP mode settings are ignored.</div>
+  </div>
+
+  <div id="pnl-content" style="display:none;">
+
+    <div id="pnl-banner"></div>
+
+    <div class="section-header" style="margin-bottom:20px;">
+      <span class="section-title">PnL Report</span>
+      <span class="section-meta" id="pnl-meta"></span>
+    </div>
+
+    <!-- ── SUMMARY CARDS ── -->
+    <div class="stat-cards" style="grid-template-columns:repeat(4,1fr); margin-bottom:20px;">
+      <div class="stat-card accent">
+        <div class="stat-label">Net RR</div>
+        <div class="stat-value" id="pnl-netrr">—</div>
+        <div class="stat-sub" id="pnl-netrr-sub"></div>
+      </div>
+      <div class="stat-card neutral">
+        <div class="stat-label">Evaluated Trades</div>
+        <div class="stat-value" id="pnl-evaluated">—</div>
+        <div class="stat-sub">pnl_r not null</div>
+      </div>
+      <div class="stat-card win">
+        <div class="stat-label">Max Win Streak</div>
+        <div class="stat-value positive" id="pnl-wstreak">—</div>
+        <div class="stat-sub">consecutive hit_tp</div>
+      </div>
+      <div class="stat-card loss">
+        <div class="stat-label">Max Loss Streak</div>
+        <div class="stat-value negative" id="pnl-lstreak">—</div>
+        <div class="stat-sub">consecutive hit_sl</div>
+      </div>
+    </div>
+
+    <!-- ── EQUITY CURVE ── -->
+    <div class="chart-card" style="margin-bottom:20px;">
+      <div class="chart-title">Equity Curve — cumulative pnl_r (entry_time order)</div>
+      <div class="chart-wrap" style="height:260px;">
+        <canvas id="pnl-chart-equity"></canvas>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <!-- ── MONTHLY + PER-SYMBOL (side by side) ── -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px;">
+
+      <!-- Monthly totals -->
+      <div>
+        <div class="pnl-section-label">Monthly Net R</div>
+        <div class="pnl-table-wrap">
+          <table class="pnl-table" id="pnl-table-monthly"></table>
+        </div>
+      </div>
+
+      <!-- Per-symbol -->
+      <div>
+        <div class="pnl-section-label">By Symbol</div>
+        <div class="pnl-table-wrap">
+          <table class="pnl-table" id="pnl-table-symbol"></table>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="section-divider"></div>
+
+    <!-- ── WEEKLY TOTALS ── -->
+    <div>
+      <div class="pnl-section-label" style="margin-bottom:12px;">
+        Weekly Net R
+        <span style="font-family:var(--sans);font-weight:400;font-size:11px;
+                     color:var(--text-dim);letter-spacing:0;text-transform:none;
+                     margin-left:8px;">zero-trade weeks shown as 0.0</span>
+      </div>
+      <div class="pnl-table-wrap">
+        <table class="pnl-table" id="pnl-table-weekly"></table>
+      </div>
+    </div>
+
+  </div><!-- /#pnl-content -->
+</div><!-- /#tab-pnl -->
+
+<style>
+  .pnl-section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  .pnl-table-wrap { overflow-x: auto; }
+
+  .pnl-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .pnl-table th {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 7px 12px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .pnl-table th:first-child { text-align: left; }
+  .pnl-table td {
+    padding: 8px 12px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .pnl-table td:first-child {
+    text-align: left;
+    font-family: var(--sans);
+    font-weight: 500;
+  }
+  .pnl-table tr:last-child td { border-bottom: none; }
+  .pnl-table tr:hover td { background: var(--bg-hover); }
+
+  .pnl-pos  { color: var(--win); }
+  .pnl-neg  { color: var(--loss); }
+  .pnl-zero { color: var(--text-dim); }
+  .pnl-dim  { color: var(--text-dim); }
+
+  /* Zero-trade week rows dimmed */
+  .pnl-table tr.zero-week td { opacity: 0.4; }
+</style>
+
+<script>
+// ── Module 7 state ─────────────────────────────────────────────
+let lastPnlData = null;
+let pnlEqChart  = null;
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER PNL REPORT
+// Called by runStatistics() in shell after parallel fetch.
+// ═══════════════════════════════════════════════════════════════
+function renderPnlReport(d) {
+  lastPnlData = d;
+
+  document.getElementById('pnl-empty-state').style.display = 'none';
+  document.getElementById('pnl-content').style.display     = 'block';
+
+  // Banner
+  const banner = document.getElementById('pnl-banner');
+  banner.innerHTML = '';
+  if (d.sample_warning) {
+    banner.innerHTML += `<div class="alert alert-warning" style="margin-bottom:16px;">
+      <span class="alert-icon">⚠</span>
+      <span>Sample size warning: only <strong>${d.evaluated_count}</strong> evaluated trades (recommended: 20+).</span>
+    </div>`;
+  }
+  if (d.excluded_count > 0) {
+    banner.innerHTML += `<div class="alert alert-info" style="margin-bottom:16px;">
+      <span class="alert-icon">ℹ</span>
+      <span><strong>${d.excluded_count}</strong> trade${d.excluded_count !== 1 ? 's' : ''} excluded (price_path_captured = false).</span>
+    </div>`;
+  }
+
+  // Meta
+  document.getElementById('pnl-meta').textContent =
+    `${d.total_trades} trades · pnl_r (authoritative)`;
+
+  // Net RR card
+  const netEl = document.getElementById('pnl-netrr');
+  netEl.textContent = (d.net_rr >= 0 ? '+' : '') + d.net_rr.toFixed(2) + 'R';
+  netEl.className   = `stat-value ${d.net_rr > 0 ? 'positive' : d.net_rr < 0 ? 'negative' : ''}`;
+  document.getElementById('pnl-netrr-sub').textContent = `${d.evaluated_count} trades`;
+
+  // Counts + streaks
+  document.getElementById('pnl-evaluated').textContent = d.evaluated_count;
+  document.getElementById('pnl-wstreak').textContent   = d.max_win_streak;
+  document.getElementById('pnl-lstreak').textContent   = d.max_loss_streak;
+
+  // Equity curve — reuse shared renderChart from shell
+  renderChart('pnl-chart-equity', d.equity_curve, 'equity', pnlEqChart,
+    v => { pnlEqChart = v; });
+
+  // Tables
+  _renderPnlMonthly(d.monthly_totals);
+  _renderPnlSymbol(d.by_symbol);
+  _renderPnlWeekly(d.weekly_totals);
+}
+
+// ── Monthly table ──────────────────────────────────────────────
+function _renderPnlMonthly(rows) {
+  const table = document.getElementById('pnl-table-monthly');
+  if (!rows || rows.length === 0) {
+    table.innerHTML = `<tr><td colspan="3" style="text-align:center;
+      color:var(--text-dim);padding:20px;font-size:12px;">No data</td></tr>`;
+    return;
+  }
+
+  let html = `<thead><tr>
+    <th>Month</th><th>Trades</th><th>Net R</th>
+  </tr></thead><tbody>`;
+
+  for (const r of rows) {
+    const netCls = r.net_rr > 0 ? 'pnl-pos' : r.net_rr < 0 ? 'pnl-neg' : 'pnl-zero';
+    const netStr = (r.net_rr >= 0 ? '+' : '') + r.net_rr.toFixed(2) + 'R';
+    const cntCls = r.count === 0 ? 'pnl-dim' : '';
+    html += `<tr>
+      <td>${escHtml(_fmtMonth(r.month))}</td>
+      <td class="${cntCls}">${r.count}</td>
+      <td class="${netCls}">${netStr}</td>
+    </tr>`;
+  }
+
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+// ── Symbol table ───────────────────────────────────────────────
+function _renderPnlSymbol(rows) {
+  const table = document.getElementById('pnl-table-symbol');
+  if (!rows || rows.length === 0) {
+    table.innerHTML = `<tr><td colspan="3" style="text-align:center;
+      color:var(--text-dim);padding:20px;font-size:12px;">No data</td></tr>`;
+    return;
+  }
+
+  let html = `<thead><tr>
+    <th>Symbol</th><th>Trades</th><th>Net RR</th>
+  </tr></thead><tbody>`;
+
+  for (const r of rows) {
+    const netCls = r.net_rr > 0 ? 'pnl-pos' : r.net_rr < 0 ? 'pnl-neg' : 'pnl-zero';
+    const netStr = (r.net_rr >= 0 ? '+' : '') + r.net_rr.toFixed(2) + 'R';
+    html += `<tr>
+      <td>${escHtml(r.symbol)}</td>
+      <td class="pnl-dim">${r.count}</td>
+      <td class="${netCls}">${netStr}</td>
+    </tr>`;
+  }
+
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+// ── Weekly table ───────────────────────────────────────────────
+function _renderPnlWeekly(rows) {
+  const table = document.getElementById('pnl-table-weekly');
+  if (!rows || rows.length === 0) {
+    table.innerHTML = `<tr><td colspan="3" style="text-align:center;
+      color:var(--text-dim);padding:20px;font-size:12px;">No data</td></tr>`;
+    return;
+  }
+
+  let html = `<thead><tr>
+    <th>Week</th><th>Trades</th><th>Net R</th>
+  </tr></thead><tbody>`;
+
+  for (const r of rows) {
+    const isZero = r.count === 0;
+    const netCls = r.net_rr > 0 ? 'pnl-pos' : r.net_rr < 0 ? 'pnl-neg' : 'pnl-zero';
+    const netStr = (r.net_rr >= 0 ? '+' : '') + r.net_rr.toFixed(2) + 'R';
+    const trCls  = isZero ? ' class="zero-week"' : '';
+    html += `<tr${trCls}>
+      <td>${escHtml(r.week)}</td>
+      <td class="pnl-dim">${r.count}</td>
+      <td class="${netCls}">${netStr}</td>
+    </tr>`;
+  }
+
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+// ── Helpers ────────────────────────────────────────────────────
+function _fmtMonth(key) {
+  // 'YYYY-MM' → 'Jan 2026' style
+  if (!key || key.length < 7) return key;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun',
+                  'Jul','Aug','Sep','Oct','Nov','Dec'];
+  const year  = parseInt(key.slice(0, 4));
+  const month = parseInt(key.slice(5, 7)) - 1;
+  return `${months[month] || key.slice(5,7)} ${year}`;
+}
+</script>

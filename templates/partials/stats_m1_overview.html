@@ -1,0 +1,365 @@
+{#
+  partials/stats_m1_overview.html
+  ────────────────────────────────
+  Module 1 — Performance Overview
+  Handles: original_tp / fixed_tp / fixed_untp / untp_overview
+  Panels:   #panel-overview (overview result)
+            #panel-untp     (UNTP stats result)
+  JS:       renderOverview(), renderUntpStats()
+            Chart state: equityChart, ddChart, untpEqChart, untpDdChart
+  Shared:   renderChart(), showError(), activeBe, lastUntpData — all in statistics.html shell
+#}
+
+<div class="tab-pane active" id="tab-overview">
+
+  <!-- Empty state — shown until first Run -->
+  <div class="empty-state" id="empty-state">
+    <div class="empty-icon">◈</div>
+    <div class="empty-title">Configure filters &amp; run statistics</div>
+    <div class="empty-sub">Select channels, choose a TP evaluation mode, and click <strong>Run Statistics</strong>.</div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       PANEL A — original_tp / fixed_tp / fixed_untp
+       Win Rate · Net R · Expectancy · Avg Win · Avg Loss
+       Win · Loss · Inconclusive · Excluded
+  ══════════════════════════════════════════════════════ -->
+  <div id="panel-overview">
+    <div id="ov-banner"></div>
+
+    <div class="section-header">
+      <span class="section-title">Performance Overview</span>
+      <span class="section-meta" id="ov-meta"></span>
+    </div>
+
+    <div class="stat-cards">
+      <div class="stat-card win">
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-value" id="ov-winrate">—</div>
+        <div class="stat-sub" id="ov-winrate-sub"></div>
+      </div>
+      <div class="stat-card accent">
+        <div class="stat-label">Net R</div>
+        <div class="stat-value" id="ov-netrr">—</div>
+        <div class="stat-sub" id="ov-netrr-sub"></div>
+      </div>
+      <div class="stat-card neutral">
+        <div class="stat-label">Expectancy</div>
+        <div class="stat-value" id="ov-exp">—</div>
+        <div class="stat-sub">R per trade</div>
+      </div>
+      <div class="stat-card win">
+        <div class="stat-label">Avg Win</div>
+        <div class="stat-value positive" id="ov-avgwin">—</div>
+        <div class="stat-sub">R</div>
+      </div>
+      <div class="stat-card loss">
+        <div class="stat-label">Avg Loss</div>
+        <div class="stat-value negative" id="ov-avgloss">—</div>
+        <div class="stat-sub">R</div>
+      </div>
+    </div>
+
+    <div class="counts-row">
+      <div class="count-item">
+        <span class="count-dot win"></span>
+        <span class="count-label">Wins</span>
+        <span class="count-num win" id="ov-c-wins">—</span>
+      </div>
+      <div class="count-item">
+        <span class="count-dot loss"></span>
+        <span class="count-label">Losses</span>
+        <span class="count-num loss" id="ov-c-losses">—</span>
+      </div>
+      <div class="count-item">
+        <span class="count-dot inconclusive"></span>
+        <span class="count-label">Inconclusive</span>
+        <span class="count-num inconclusive" id="ov-c-incon">—</span>
+      </div>
+      <div class="count-item">
+        <span class="count-dot excluded"></span>
+        <span class="count-label">Excluded (bad data)</span>
+        <span class="count-num excluded" id="ov-c-excl">—</span>
+      </div>
+    </div>
+
+    <div class="streak-row">
+      <div class="streak-chip win-streak">▲ Max win streak: <span id="ov-wstreak">—</span></div>
+      <div class="streak-chip loss-streak">▼ Max loss streak: <span id="ov-lstreak">—</span></div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Equity Curve (cumulative R)</div>
+        <div class="chart-wrap"><canvas id="ov-chart-equity"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Drawdown</div>
+        <div class="chart-wrap"><canvas id="ov-chart-dd"></canvas></div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <div class="mfe-mae-row">
+      <div class="mfe-mae-card">
+        <div class="mfe-mae-label">Avg MFE</div>
+        <div class="mfe-mae-value mfe" id="ov-avgmfe">—</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">peak in favour, R</div>
+      </div>
+      <div class="mfe-mae-card">
+        <div class="mfe-mae-label">Avg MAE</div>
+        <div class="mfe-mae-value mae" id="ov-avgmae">—</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">peak against, R</div>
+      </div>
+      <div class="mfe-mae-card">
+        <div class="mfe-mae-label">Max Drawdown</div>
+        <div class="mfe-mae-value dd" id="ov-maxdd">—</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">peak-to-trough, R</div>
+      </div>
+    </div>
+  </div><!-- /#panel-overview -->
+
+  <!-- ══════════════════════════════════════════════════════
+       PANEL B — untp_overview
+       Open Rate · Net R · Expectancy · Avg Open MFE · Avg Open MAE
+       Open · SL · BE · Excluded
+       Client-side BE toggle switches pre-computed group — no re-fetch
+  ══════════════════════════════════════════════════════ -->
+  <div id="panel-untp">
+    <div id="untp-banner"></div>
+
+    <div class="section-header">
+      <span class="section-title" id="untp-title">UNTP Overview</span>
+      <span class="section-meta" id="untp-meta"></span>
+    </div>
+
+    <div class="stat-cards">
+      <div class="stat-card open">
+        <div class="stat-label">Open Rate</div>
+        <div class="stat-value open-col" id="untp-openrate">—</div>
+        <div class="stat-sub" id="untp-openrate-sub"></div>
+      </div>
+      <div class="stat-card accent">
+        <div class="stat-label">Net R</div>
+        <div class="stat-value" id="untp-netrr">—</div>
+        <div class="stat-sub" id="untp-netrr-sub"></div>
+      </div>
+      <div class="stat-card neutral">
+        <div class="stat-label">Expectancy</div>
+        <div class="stat-value" id="untp-exp">—</div>
+        <div class="stat-sub">R per trade</div>
+      </div>
+      <div class="stat-card open">
+        <div class="stat-label">Avg Open MFE</div>
+        <div class="stat-value open-col" id="untp-avgmfe">—</div>
+        <div class="stat-sub">at window, R</div>
+      </div>
+      <div class="stat-card loss">
+        <div class="stat-label">Avg Open MAE</div>
+        <div class="stat-value negative" id="untp-avgmae">—</div>
+        <div class="stat-sub">at window, R</div>
+      </div>
+    </div>
+
+    <div class="counts-row">
+      <div class="count-item">
+        <span class="count-dot open"></span>
+        <span class="count-label">Open (alive at window)</span>
+        <span class="count-num open" id="untp-c-open">—</span>
+      </div>
+      <div class="count-item">
+        <span class="count-dot sl"></span>
+        <span class="count-label">Stopped — SL</span>
+        <span class="count-num sl" id="untp-c-sl">—</span>
+      </div>
+      <div class="count-item">
+        <span class="count-dot be"></span>
+        <span class="count-label">Stopped — BE</span>
+        <span class="count-num be" id="untp-c-be">—</span>
+      </div>
+      <div class="count-item">
+        <span class="count-dot excluded"></span>
+        <span class="count-label">Excluded (bad data)</span>
+        <span class="count-num excluded" id="untp-c-excl">—</span>
+      </div>
+    </div>
+
+    <div class="streak-row">
+      <div class="streak-chip open-streak">▲ Max open streak: <span id="untp-ostreak">—</span></div>
+      <div class="streak-chip sl-streak">▼ Max SL streak: <span id="untp-sstreak">—</span></div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Equity Curve (Open=MFE · SL=−1R · BE=0R)</div>
+        <div class="chart-wrap"><canvas id="untp-chart-equity"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Drawdown</div>
+        <div class="chart-wrap"><canvas id="untp-chart-dd"></canvas></div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <div class="mfe-mae-row">
+      <div class="mfe-mae-card">
+        <div class="mfe-mae-label">Avg Open MFE</div>
+        <div class="mfe-mae-value mfe" id="untp-mfe-card">—</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">peak MFE at window (Open trades)</div>
+      </div>
+      <div class="mfe-mae-card">
+        <div class="mfe-mae-label">Avg Open MAE</div>
+        <div class="mfe-mae-value mae" id="untp-mae-card">—</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">peak MAE at window (Open trades)</div>
+      </div>
+      <div class="mfe-mae-card">
+        <div class="mfe-mae-label">Max Drawdown</div>
+        <div class="mfe-mae-value dd" id="untp-maxdd">—</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">peak-to-trough, R</div>
+      </div>
+    </div>
+  </div><!-- /#panel-untp -->
+
+</div><!-- /#tab-overview -->
+
+<script>
+// ── Module 1 chart state ───────────────────────────────────────
+// Kept here so they're co-located with the render functions that use them.
+// renderChart() and activeBe/lastUntpData live in the shell script.
+let equityChart = null;
+let ddChart     = null;
+let untpEqChart = null;
+let untpDdChart = null;
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER OVERVIEW — original_tp / fixed_tp / fixed_untp
+// result_type = 'overview'
+// ═══════════════════════════════════════════════════════════════
+function renderOverview(d) {
+  document.getElementById('empty-state').style.display    = 'none';
+  document.getElementById('panel-overview').style.display = 'block';
+  document.getElementById('panel-untp').style.display     = 'none';
+
+  const bannerArea = document.getElementById('ov-banner');
+  bannerArea.innerHTML = '';
+  if (d.sample_warning) {
+    bannerArea.innerHTML += `<div class="alert alert-warning"><span class="alert-icon">⚠</span>
+      <span>Sample size warning: only <strong>${d.evaluated_count}</strong> evaluated trades (recommended: 20+).</span></div>`;
+  }
+  if (d.excluded_count > 0) {
+    bannerArea.innerHTML += `<div class="alert alert-info"><span class="alert-icon">ℹ</span>
+      <span><strong>${d.excluded_count}</strong> trade${d.excluded_count !== 1 ? 's' : ''} excluded (price_path_captured = false).</span></div>`;
+  }
+
+  const modeLabels = {
+    'original_tp': 'Original TP',
+    'fixed_tp':    `Fixed ${d.tp_value}${d.unit === 'pips' ? ' pips' : 'R'} (Trade Walk)`,
+    'fixed_untp':  `Fixed ${d.tp_value}${d.unit === 'pips' ? ' pips' : 'R'} (UNTP Peak · ${d.time_limit_label})`,
+  };
+  document.getElementById('ov-meta').textContent =
+    `${d.total_trades} trades · ${modeLabels[d.tp_mode] || d.tp_mode}`;
+
+  const wr   = d.win_rate;
+  const wrEl = document.getElementById('ov-winrate');
+  wrEl.textContent = `${wr.toFixed(1)}%`;
+  wrEl.className   = `stat-value ${wr >= 50 ? 'positive' : 'negative'}`;
+  document.getElementById('ov-winrate-sub').textContent = `${d.wins}W / ${d.losses}L`;
+
+  const netEl = document.getElementById('ov-netrr');
+  netEl.textContent = (d.net_rr >= 0 ? '+' : '') + d.net_rr.toFixed(2) + 'R';
+  netEl.className   = `stat-value ${d.net_rr >= 0 ? 'positive' : 'negative'}`;
+  document.getElementById('ov-netrr-sub').textContent = `${d.evaluated_count} trades evaluated`;
+
+  const expEl = document.getElementById('ov-exp');
+  expEl.textContent = (d.expectancy >= 0 ? '+' : '') + d.expectancy.toFixed(3);
+  expEl.className   = `stat-value ${d.expectancy >= 0 ? 'positive' : 'negative'}`;
+
+  document.getElementById('ov-avgwin').textContent  = `+${d.avg_win_r.toFixed(2)}`;
+  document.getElementById('ov-avgloss').textContent = d.avg_loss_r.toFixed(2);
+
+  document.getElementById('ov-c-wins').textContent   = d.wins;
+  document.getElementById('ov-c-losses').textContent = d.losses;
+  document.getElementById('ov-c-incon').textContent  = d.inconclusive_count;
+  document.getElementById('ov-c-excl').textContent   = d.excluded_count;
+
+  document.getElementById('ov-wstreak').textContent = d.max_win_streak;
+  document.getElementById('ov-lstreak').textContent = d.max_loss_streak;
+
+  document.getElementById('ov-avgmfe').textContent = d.avg_mfe_r.toFixed(3) + 'R';
+  document.getElementById('ov-avgmae').textContent = d.avg_mae_r.toFixed(3) + 'R';
+  document.getElementById('ov-maxdd').textContent  = d.max_drawdown.toFixed(2) + 'R';
+
+  renderChart('ov-chart-equity', d.equity_curve,   'equity',   equityChart, v => { equityChart = v; });
+  renderChart('ov-chart-dd',     d.drawdown_curve, 'drawdown', ddChart,     v => { ddChart     = v; });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER UNTP STATS — untp_overview
+// result_type = 'untp_stats'
+// Client-side BE toggle switches pre-computed group — no re-fetch
+// ═══════════════════════════════════════════════════════════════
+function renderUntpStats(d) {
+  document.getElementById('empty-state').style.display    = 'none';
+  document.getElementById('panel-overview').style.display = 'none';
+  document.getElementById('panel-untp').style.display     = 'block';
+
+  const groupKey = { 'all': 'stats_all', 'be_active': 'stats_be_active', 'no_be': 'stats_no_be' };
+  const g = d[groupKey[activeBe] || 'stats_all'];
+
+  const bannerArea = document.getElementById('untp-banner');
+  bannerArea.innerHTML = '';
+  if (g.sample_warning) {
+    bannerArea.innerHTML += `<div class="alert alert-warning"><span class="alert-icon">⚠</span>
+      <span>Sample size warning: only <strong>${g.total}</strong> evaluated trades (recommended: 20+).</span></div>`;
+  }
+  if (d.excluded_count > 0) {
+    bannerArea.innerHTML += `<div class="alert alert-info"><span class="alert-icon">ℹ</span>
+      <span><strong>${d.excluded_count}</strong> trade${d.excluded_count !== 1 ? 's' : ''} excluded (price_path_captured = false).</span></div>`;
+  }
+
+  document.getElementById('untp-title').textContent = 'UNTP Overview';
+
+  const beLabel = { all: 'All trades', be_active: 'BE Active', no_be: 'No BE' }[activeBe];
+  document.getElementById('untp-meta').textContent =
+    `${d.total_trades} trades · ${d.time_limit_label} · ${beLabel}`;
+
+  const orEl = document.getElementById('untp-openrate');
+  orEl.textContent = `${g.open_rate.toFixed(1)}%`;
+  orEl.className   = 'stat-value open-col';
+  document.getElementById('untp-openrate-sub').textContent =
+    `${g.open_count} Open / ${g.sl_count} SL / ${g.be_count} BE`;
+
+  const netEl = document.getElementById('untp-netrr');
+  netEl.textContent = (g.net_r >= 0 ? '+' : '') + g.net_r.toFixed(2) + 'R';
+  netEl.className   = `stat-value ${g.net_r >= 0 ? 'positive' : 'negative'}`;
+  document.getElementById('untp-netrr-sub').textContent = `${g.total} trades evaluated`;
+
+  const expEl = document.getElementById('untp-exp');
+  expEl.textContent = (g.expectancy >= 0 ? '+' : '') + g.expectancy.toFixed(3);
+  expEl.className   = `stat-value ${g.expectancy >= 0 ? 'positive' : 'negative'}`;
+
+  document.getElementById('untp-avgmfe').textContent = g.avg_open_mfe_r.toFixed(3) + 'R';
+  document.getElementById('untp-avgmae').textContent = g.avg_open_mae_r.toFixed(3) + 'R';
+
+  document.getElementById('untp-c-open').textContent = g.open_count;
+  document.getElementById('untp-c-sl').textContent   = g.sl_count;
+  document.getElementById('untp-c-be').textContent   = g.be_count;
+  document.getElementById('untp-c-excl').textContent = d.excluded_count;
+
+  document.getElementById('untp-ostreak').textContent = g.max_open_streak;
+  document.getElementById('untp-sstreak').textContent = g.max_sl_streak;
+
+  document.getElementById('untp-mfe-card').textContent = g.avg_open_mfe_r.toFixed(3) + 'R';
+  document.getElementById('untp-mae-card').textContent = g.avg_open_mae_r.toFixed(3) + 'R';
+  document.getElementById('untp-maxdd').textContent    = g.max_drawdown.toFixed(2) + 'R';
+
+  renderChart('untp-chart-equity', g.equity_curve,   'equity',   untpEqChart, v => { untpEqChart = v; });
+  renderChart('untp-chart-dd',     g.drawdown_curve, 'drawdown', untpDdChart, v => { untpDdChart = v; });
+}
+</script>

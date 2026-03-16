@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trade Monitor — Backtrack</title>
+
+  <script>
+    window.addEventListener("pageshow", function(e) { if (!e.persisted) localStorage.clear(); });
+  </script>
+
+  <style>
+    :root {
+      --primary:    #1e90ff;
+      --bg-dark:    #2c2c2c;
+      --bg-card:    #1e1e1e;
+      --bg-input:   #3c3c3c;
+      --border:     #555;
+      --text:       #f0f0f0;
+      --text-muted: #aaa;
+      --shadow:     0 4px 15px rgba(0,0,0,.7);
+      --radius:     10px;
+      --radius-sm:  5px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text);
+      font-family: Arial, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    /* ── NAV ── */
+    nav {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 48px;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 10px rgba(0,0,0,.5);
+    }
+    .nav-brand {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--primary);
+      text-decoration: none;
+      margin-right: 10px;
+    }
+    .nav-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+    .nav-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      transition: background .15s, color .15s;
+    }
+    .nav-link:hover { background: rgba(255,255,255,.07); color: var(--text); }
+    .nav-link.active { color: var(--text); background: rgba(255,255,255,.06); font-weight: 600; }
+    .nav-link.outline { border: 1px solid var(--primary); color: var(--primary); margin-left: 4px; }
+    .nav-link.outline:hover { background: rgba(30,144,255,.12); }
+
+    /* ── FORM CONTAINER ── */
+    .form-container {
+      width: 100%;
+      max-width: 1000px;
+      margin: 24px auto;
+      padding: 30px;
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    /* ── 2-COLUMN LAYOUT ── */
+    .form-inner {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0;
+    }
+    .col {
+      flex: 1;
+      min-width: 300px;
+      padding: 0 20px;
+    }
+    .divider {
+      width: 2px;
+      background: var(--border);
+      margin: 0 10px;
+      flex-shrink: 0;
+    }
+
+    /* ── FIELDSET / LEGEND ── */
+    fieldset { border: none; margin: 0; padding: 0; }
+    legend {
+      font-size: 1.4rem;
+      font-weight: bold;
+      margin-bottom: 18px;
+      color: var(--primary);
+    }
+
+    /* ── LABELS & INPUTS ── */
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+      font-size: 1rem;
+    }
+    .input-row {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 12px;
+    }
+    input,
+    select {
+      background: var(--bg-input);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      font-size: 1rem;
+      margin-top: 6px;
+      width: 100%;
+      outline: none;
+      transition: border-color .18s;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    input:focus, select:focus { border-color: var(--primary); }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23aaa' d='M5 6L0 0h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 34px;
+    }
+    input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+      filter: invert(60%) sepia(20%) saturate(400%) hue-rotate(180deg);
+      cursor: pointer;
+    }
+
+    /* ── SUBMIT BUTTON ── */
+    .btn-submit {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      margin-top: 28px;
+      width: 100%;
+      font-weight: bold;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: background .18s, transform .15s;
+    }
+    .btn-submit:hover { background: #1c86ee; transform: translateY(-1px); }
+
+    /* ── ERROR ── */
+    .error {
+      color: #ff6f61;
+      font-weight: bold;
+      margin-bottom: 20px;
+      font-size: 1rem;
+      padding: 10px 14px;
+      background: rgba(255,111,97,.1);
+      border: 1px solid rgba(255,111,97,.3);
+      border-radius: var(--radius-sm);
+    }
+
+    /* ── HINT TEXT ── */
+    .hint { font-size: 0.82rem; color: var(--text-muted); margin-top: 4px; font-weight: normal; }
+
+    /* ── EXPIRY SUBSECTION ── */
+    .subsection {
+      background: rgba(255,255,255,.03);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      margin-top: 14px;
+    }
+    .subsection legend { font-size: 1rem; margin-bottom: 10px; }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 700px) {
+      .col { padding: 0 8px; }
+      .divider { display: none; }
+      .form-container { padding: 20px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a class="nav-brand" href="/">Backtrack</a>
+    <div class="nav-sep"></div>
+    <a class="nav-link active" href="/">Monitor</a>
+    <a class="nav-link" href="/channels">Channels</a>
+    <a class="nav-link" href="/statistics">Statistics</a>
+    <div style="margin-left:auto;">
+      <a class="nav-link outline" href="/channels">📂 Journal</a>
+    </div>
+  </nav>
+
+  <div class="form-container">
+
+    {% if error %}
+      <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <form action="{{ url_for('monitor_trade_route') }}" method="post" id="monitorForm">
+
+      <div class="form-inner">
+
+        <!-- ── LEFT COLUMN: Date/Time + Symbol/Type ── -->
+        <div class="col">
+          <fieldset>
+            <legend>Entry Details</legend>
+
+            <div class="input-row">
+              <label for="year">Year</label>
+              <input type="number" id="year" name="year" min="2000" max="2100" placeholder="e.g. 2026" required>
+            </div>
+            <div class="input-row">
+              <label for="month">Month</label>
+              <input type="number" id="month" name="month" min="1" max="12" placeholder="1 – 12" required>
+            </div>
+            <div class="input-row">
+              <label for="day">Day</label>
+              <input type="number" id="day" name="day" min="1" max="31" placeholder="1 – 31" required>
+            </div>
+            <div class="input-row">
+              <label for="hour">Hour <span class="hint" style="display:inline;">(24-hour)</span></label>
+              <input type="number" id="hour" name="hour" min="0" max="23" placeholder="0 – 23" required>
+            </div>
+            <div class="input-row">
+              <label for="minute">Minute</label>
+              <input type="number" id="minute" name="minute" min="0" max="59" placeholder="0 – 59" required>
+            </div>
+
+            <div class="input-row">
+              <label for="symbol">Symbol</label>
+              <input list="symbol-list" id="symbol" name="symbol" required
+                     placeholder="e.g. EURUSD, XAUUSD">
+              <datalist id="symbol-list">
+                {% for sym in symbols %}
+                  <option value="{{ sym }}"></option>
+                {% endfor %}
+              </datalist>
+            </div>
+
+            <div class="input-row">
+              <label for="trade_type">Trade Type</label>
+              <select id="trade_type" name="trade_type"
+                      onchange="toggleLimitPriceInput()" required>
+                <option value="">Select…</option>
+                <option value="buy">Buy</option>
+                <option value="sell">Sell</option>
+                <option value="limit_buy">Limit Buy</option>
+                <option value="limit_sell">Limit Sell</option>
+                <option value="stop_buy">Stop Buy</option>
+                <option value="stop_sell">Stop Sell</option>
+              </select>
+            </div>
+
+            <!-- Limit/Stop price — shown for pending orders only -->
+            <div id="limit_price_input" class="input-row hidden">
+              <label for="limit_price" id="limit_price_label">Limit Price</label>
+              <input type="number" step="0.00001" id="limit_price" name="limit_price"
+                     placeholder="0.00000">
+            </div>
+
+            <!-- Expiry — shown for pending orders only -->
+            <div id="expiry_section" class="hidden">
+              <div class="subsection">
+                <fieldset>
+                  <legend>Order Expiry</legend>
+                  <div class="input-row">
+                    <label for="expiry_enabled">Enable Expiry</label>
+                    <select id="expiry_enabled" name="expiry_enabled"
+                            onchange="toggleExpiryFields()">
+                      <option value="">Select…</option>
+                      <option value="true">Yes</option>
+                      <option value="false">No</option>
+                    </select>
+                  </div>
+                  <div id="expiry_fields" class="hidden">
+                    <div class="input-row">
+                      <label for="expiry_days">Days</label>
+                      <input type="number" id="expiry_days" name="expiry_days" min="0" value="0">
+                    </div>
+                    <div class="input-row">
+                      <label for="expiry_hours">Hours</label>
+                      <input type="number" id="expiry_hours" name="expiry_hours" min="0" value="0">
+                    </div>
+                    <div class="input-row">
+                      <label for="expiry_minutes">Minutes</label>
+                      <input type="number" id="expiry_minutes" name="expiry_minutes" min="0" value="0">
+                    </div>
+                  </div>
+                </fieldset>
+              </div>
+            </div>
+
+          </fieldset>
+        </div>
+
+        <!-- DIVIDER -->
+        <div class="divider"></div>
+
+        <!-- ── RIGHT COLUMN: SL/TP + BE + Close time ── -->
+        <div class="col">
+          <fieldset>
+            <legend>Trade Parameters</legend>
+
+            <div class="input-row">
+              <label for="input_type">Input Mode</label>
+              <select id="input_type" name="input_type"
+                      onchange="toggleInputType()" required>
+                <option value="">Select…</option>
+                <option value="prices">Prices</option>
+                <option value="pips">Pips</option>
+                <option value="rr">Risk-Reward (RR)</option>
+              </select>
+            </div>
+
+            <!-- Prices mode -->
+            <div id="price_inputs" class="hidden">
+              <div class="input-row">
+                <label for="stoploss_price">Stop Loss Price</label>
+                <input type="number" step="0.00001" id="stoploss_price"
+                       name="stoploss_price" placeholder="0.00000">
+              </div>
+              <div class="input-row">
+                <label for="takeprofit_price">Take Profit Price</label>
+                <input type="number" step="0.00001" id="takeprofit_price"
+                       name="takeprofit_price" placeholder="0.00000">
+              </div>
+            </div>
+
+            <!-- Pips mode -->
+            <div id="pip_inputs" class="hidden">
+              <div class="input-row">
+                <label for="stoploss_pips">Stop Loss (pips)</label>
+                <input type="number" step="0.001" id="stoploss_pips"
+                       name="stoploss_pips" placeholder="0.000">
+              </div>
+              <div class="input-row">
+                <label for="takeprofit_pips">Take Profit (pips)</label>
+                <input type="number" step="0.001" id="takeprofit_pips"
+                       name="takeprofit_pips" placeholder="0.000">
+              </div>
+            </div>
+
+            <!-- RR mode -->
+            <div id="rr_inputs" class="hidden">
+              <div class="input-row">
+                <label for="rr_ratio">R:R Ratio</label>
+                <input type="number" step="0.001" id="rr_ratio"
+                       name="rr_ratio" placeholder="e.g. 2.5">
+              </div>
+              <div class="input-row">
+                <label for="stoploss_type_rr">Stop Loss Specified As</label>
+                <select id="stoploss_type_rr" name="stoploss_type_rr"
+                        onchange="toggleStopLossInputRR()">
+                  <option value="">Select…</option>
+                  <option value="price">Price</option>
+                  <option value="pips">Pips</option>
+                </select>
+              </div>
+              <div id="stoploss_price_rr_input" class="input-row hidden">
+                <label for="stoploss_price_rr">Stop Loss Price</label>
+                <input type="number" step="0.00001" id="stoploss_price_rr"
+                       name="stoploss_price_rr" placeholder="0.00000">
+              </div>
+              <div id="stoploss_pips_rr_input" class="input-row hidden">
+                <label for="stoploss_pips_rr">Stop Loss Pips</label>
+                <input type="number" step="0.001" id="stoploss_pips_rr"
+                       name="stoploss_pips_rr" placeholder="0.000">
+              </div>
+            </div>
+
+            <!-- Breakeven -->
+            <div class="input-row">
+              <label for="breakeven">Breakeven</label>
+              <select id="breakeven" name="breakeven"
+                      onchange="toggleBreakeven()" required>
+                <option value="">Select…</option>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
+            </div>
+
+            <div id="breakeven_type_container" class="hidden">
+              <div class="input-row">
+                <label for="breakeven_type">Breakeven Trigger</label>
+                <select id="breakeven_type" name="breakeven_type"
+                        onchange="toggleBreakevenType()">
+                  <option value="">Select…</option>
+                  <option value="rr">Risk-Reward (RR)</option>
+                  <option value="pips">Pips</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="breakeven_rr_input" class="input-row hidden">
+              <label for="breakeven_rr">Breakeven at (R)</label>
+              <input type="number" step="0.001" id="breakeven_rr"
+                     name="breakeven_rr" min="0" max="10" placeholder="e.g. 1.0">
+            </div>
+
+            <div id="breakeven_pips_input" class="input-row hidden">
+              <label for="breakeven_pips">Breakeven at (pips)</label>
+              <input type="number" step="0.001" id="breakeven_pips"
+                     name="breakeven_pips" min="0" placeholder="e.g. 20">
+            </div>
+
+            <!-- Optional close time -->
+            <div class="input-row">
+              <label for="close_trade_time">Force Close Time <span class="hint" style="display:inline;">(optional)</span></label>
+              <input type="text" id="close_trade_time" name="close_trade_time"
+                     placeholder="YYYY-MM-DD HH:MM">
+              <span class="hint">Leave blank to run to TP / SL / BE naturally</span>
+            </div>
+
+          </fieldset>
+
+          <button type="submit" class="btn-submit">▶ Run Monitor</button>
+        </div>
+
+      </div><!-- /.form-inner -->
+    </form>
+  </div>
+
+  <script>
+    /* ── Local storage persistence ── */
+    function saveState() {
+      document.querySelectorAll('input, select').forEach(function(el) {
+        if (el.id) localStorage.setItem(el.id, el.value);
+      });
+    }
+    function loadState() {
+      document.querySelectorAll('input, select').forEach(function(el) {
+        if (el.id && localStorage.getItem(el.id) !== null) el.value = localStorage.getItem(el.id);
+      });
+    }
+
+    /* ── Enable/disable helper ── */
+    function enableFields(container, enable) {
+      container.querySelectorAll('input, select').forEach(function(el) {
+        el.disabled = !enable;
+        if (enable && el.dataset.required === 'true') el.setAttribute('required','required');
+        else el.removeAttribute('required');
+      });
+    }
+
+    /* ── Toggles ── */
+    function toggleInputType() {
+      var v = document.getElementById('input_type').value;
+      var p = document.getElementById('price_inputs');
+      var i = document.getElementById('pip_inputs');
+      var r = document.getElementById('rr_inputs');
+      p.classList.add('hidden'); enableFields(p, false);
+      i.classList.add('hidden'); enableFields(i, false);
+      r.classList.add('hidden'); enableFields(r, false);
+      if      (v === 'prices') { p.classList.remove('hidden'); enableFields(p, true); }
+      else if (v === 'pips')   { i.classList.remove('hidden'); enableFields(i, true); }
+      else if (v === 'rr')     { r.classList.remove('hidden'); enableFields(r, true); }
+      saveState();
+    }
+
+    function toggleStopLossInputRR() {
+      var v  = document.getElementById('stoploss_type_rr').value;
+      var sp = document.getElementById('stoploss_price_rr_input');
+      var si = document.getElementById('stoploss_pips_rr_input');
+      sp.classList.add('hidden'); enableFields(sp, false);
+      si.classList.add('hidden'); enableFields(si, false);
+      if      (v === 'price') { sp.classList.remove('hidden'); enableFields(sp, true); }
+      else if (v === 'pips')  { si.classList.remove('hidden'); enableFields(si, true); }
+      saveState();
+    }
+
+    function toggleBreakeven() {
+      var v   = document.getElementById('breakeven').value;
+      var btc = document.getElementById('breakeven_type_container');
+      var brr = document.getElementById('breakeven_rr_input');
+      var bpi = document.getElementById('breakeven_pips_input');
+      if (v === 'true') {
+        btc.classList.remove('hidden'); enableFields(btc, true);
+      } else {
+        btc.classList.add('hidden');    enableFields(btc, false);
+        brr.classList.add('hidden');    enableFields(brr, false);
+        bpi.classList.add('hidden');    enableFields(bpi, false);
+      }
+      saveState();
+    }
+
+    function toggleBreakevenType() {
+      var v   = document.getElementById('breakeven_type').value;
+      var brr = document.getElementById('breakeven_rr_input');
+      var bpi = document.getElementById('breakeven_pips_input');
+      brr.classList.add('hidden'); enableFields(brr, false);
+      bpi.classList.add('hidden'); enableFields(bpi, false);
+      if      (v === 'rr')   { brr.classList.remove('hidden'); enableFields(brr, true); }
+      else if (v === 'pips') { bpi.classList.remove('hidden'); enableFields(bpi, true); }
+      saveState();
+    }
+
+    function toggleLimitPriceInput() {
+      var v   = document.getElementById('trade_type').value;
+      var box = document.getElementById('limit_price_input');
+      var lbl = document.getElementById('limit_price_label');
+      if (v === 'limit_buy' || v === 'limit_sell') {
+        box.classList.remove('hidden'); enableFields(box, true);
+        if (lbl) lbl.textContent = 'Limit Price';
+      } else if (v === 'stop_buy' || v === 'stop_sell') {
+        box.classList.remove('hidden'); enableFields(box, true);
+        if (lbl) lbl.textContent = 'Stop Price';
+      } else {
+        box.classList.add('hidden'); enableFields(box, false);
+      }
+      toggleExpirySection();
+      saveState();
+    }
+
+    function toggleExpirySection() {
+      var v   = document.getElementById('trade_type').value;
+      var sec = document.getElementById('expiry_section');
+      var sel = document.getElementById('expiry_enabled');
+      var isPending = (v === 'limit_buy' || v === 'limit_sell' || v === 'stop_buy' || v === 'stop_sell');
+      if (isPending) {
+        sec.classList.remove('hidden');
+        sel.disabled = false;
+        sel.setAttribute('required','required');
+      } else {
+        sec.classList.add('hidden');
+        sel.disabled = true;
+        sel.removeAttribute('required');
+        toggleExpiryFields(true);
+      }
+      saveState();
+    }
+
+    function toggleExpiryFields(forceOff) {
+      var v      = document.getElementById('expiry_enabled').value;
+      var fields = document.getElementById('expiry_fields');
+      var inputs = fields.querySelectorAll('input');
+      if (!forceOff && v === 'true') {
+        fields.classList.remove('hidden');
+        inputs.forEach(function(i) { i.disabled = false; i.setAttribute('required','required'); });
+      } else {
+        fields.classList.add('hidden');
+        inputs.forEach(function(i) { i.disabled = true; i.removeAttribute('required'); });
+      }
+      saveState();
+    }
+
+    window.addEventListener('load', function() {
+      loadState();
+      toggleInputType();
+      toggleLimitPriceInput();
+      toggleBreakeven();
+      toggleStopLossInputRR();
+      toggleExpirySection();
+      toggleExpiryFields();
+      document.querySelectorAll('input:not([type=hidden]), select').forEach(function(el) {
+        el.addEventListener('change', saveState);
+      });
+    });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,251 @@
+{#
+  partials/stats_m2_hitrate.html
+  ──────────────────────────────
+  Module 2 — Hit Rate Analysis
+  Phase 5
+
+  Breakdown by: symbol, trade_type, session, day_of_week
+  Modes supported: all 4 (original_tp / fixed_tp / fixed_untp / untp_overview)
+
+  Win/loss modes: columns = Label | Trades | W | L | Inc | Win Rate | Net RR
+  untp_overview:  columns = Label | Trades | Open | SL | BE | Open % | Net R
+
+  JS entry point: renderHitRate(d) — called by runStatistics() in shell.
+  State: lastHitRateData — stored so tab switches don't need a re-fetch.
+#}
+
+<div class="tab-pane" id="tab-hitrate">
+
+  <div class="empty-state" id="hr-empty-state">
+    <div class="empty-icon">◈</div>
+    <div class="empty-title">Run statistics to see hit rate breakdown</div>
+    <div class="empty-sub">Uses the same mode and filters as Module 1.</div>
+  </div>
+
+  <div id="hr-content" style="display:none;">
+
+    <div id="hr-banner"></div>
+
+    <div class="section-header" style="margin-bottom:24px;">
+      <span class="section-title">Hit Rate Analysis</span>
+      <span class="section-meta" id="hr-meta"></span>
+    </div>
+
+    <!-- ── SYMBOL ── -->
+    <div class="hr-section" id="hr-sec-symbol">
+      <div style="font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:0.12em;
+                  text-transform:uppercase;color:var(--text-dim);margin-bottom:12px;">By Symbol</div>
+      <div class="hr-table-wrap">
+        <table class="hr-table" id="hr-table-symbol"></table>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <!-- ── TRADE TYPE ── -->
+    <div class="hr-section" id="hr-sec-tradetype">
+      <div style="font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:0.12em;
+                  text-transform:uppercase;color:var(--text-dim);margin-bottom:12px;">By Trade Type</div>
+      <div class="hr-table-wrap">
+        <table class="hr-table" id="hr-table-tradetype"></table>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <!-- ── SESSION ── -->
+    <div class="hr-section" id="hr-sec-session">
+      <div style="font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:0.12em;
+                  text-transform:uppercase;color:var(--text-dim);margin-bottom:12px;">By Session</div>
+      <div class="hr-table-wrap">
+        <table class="hr-table" id="hr-table-session"></table>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <!-- ── DAY OF WEEK ── -->
+    <div class="hr-section" id="hr-sec-dow">
+      <div style="font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:0.12em;
+                  text-transform:uppercase;color:var(--text-dim);margin-bottom:12px;">By Day of Week</div>
+      <div class="hr-table-wrap">
+        <table class="hr-table" id="hr-table-dow"></table>
+      </div>
+    </div>
+
+  </div><!-- /#hr-content -->
+</div><!-- /#tab-hitrate -->
+
+<style>
+  .hr-table-wrap {
+    overflow-x: auto;
+  }
+  .hr-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .hr-table th {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 8px 12px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .hr-table th:first-child { text-align: left; }
+  .hr-table td {
+    padding: 9px 12px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .hr-table td:first-child {
+    text-align: left;
+    font-family: var(--sans);
+    font-weight: 500;
+    color: var(--text);
+  }
+  .hr-table tr:last-child td { border-bottom: none; }
+  .hr-table tr:hover td { background: var(--bg-hover); }
+
+  .hr-wr-high { color: var(--win); }
+  .hr-wr-low  { color: var(--loss); }
+  .hr-wr-none { color: var(--text-dim); }
+  .hr-net-pos { color: var(--win); }
+  .hr-net-neg { color: var(--loss); }
+  .hr-net-zero{ color: var(--text-mid); }
+  .hr-open    { color: var(--open); }
+  .hr-sl      { color: var(--loss); }
+  .hr-be      { color: var(--be); }
+  .hr-dim     { color: var(--text-dim); }
+  .hr-zero    { color: var(--text-dim); opacity: 0.5; }
+</style>
+
+<script>
+// ── Module 2 state ─────────────────────────────────────────────
+let lastHitRateData = null;
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER HIT RATE — all 4 modes
+// Called by runStatistics() in shell after parallel fetch.
+// ═══════════════════════════════════════════════════════════════
+function renderHitRate(d) {
+  lastHitRateData = d;
+
+  document.getElementById('hr-empty-state').style.display = 'none';
+  document.getElementById('hr-content').style.display     = 'block';
+
+  // Banner
+  const banner = document.getElementById('hr-banner');
+  banner.innerHTML = '';
+  if (d.excluded_count > 0) {
+    banner.innerHTML = `<div class="alert alert-info" style="margin-bottom:20px;">
+      <span class="alert-icon">ℹ</span>
+      <span><strong>${d.excluded_count}</strong> trade${d.excluded_count !== 1 ? 's' : ''} excluded (price_path_captured = false).</span>
+    </div>`;
+  }
+
+  // Meta line
+  const isUntpOv = d.tp_mode === 'untp_overview';
+  const modeStr  = {
+    'original_tp': 'Original TP',
+    'fixed_tp':    `Fixed ${d.tp_value}${d.unit === 'pips' ? ' pips' : 'R'} (Trade Walk)`,
+    'fixed_untp':  `Fixed ${d.tp_value}${d.unit === 'pips' ? ' pips' : 'R'} (UNTP · ${d.time_limit_label})`,
+    'untp_overview': `UNTP Overview · ${d.time_limit_label}`,
+  }[d.tp_mode] || d.tp_mode;
+
+  document.getElementById('hr-meta').textContent =
+    `${d.total_trades} trades · ${modeStr}`;
+
+  // Render each dimension table
+  _renderHrTable('hr-table-symbol',    d.dimensions.symbol,      isUntpOv);
+  _renderHrTable('hr-table-tradetype', d.dimensions.trade_type,  isUntpOv);
+  _renderHrTable('hr-table-session',   d.dimensions.session,     isUntpOv);
+  _renderHrTable('hr-table-dow',       d.dimensions.day_of_week, isUntpOv);
+}
+
+// ── Internal: render one dimension table ───────────────────────
+function _renderHrTable(tableId, rows, isUntpOv) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+
+  if (!rows || rows.length === 0) {
+    table.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-dim);
+      padding:20px;font-size:12px;">No data</td></tr>`;
+    return;
+  }
+
+  let html = '<thead><tr>';
+  if (isUntpOv) {
+    html += `
+      <th>Label</th>
+      <th>Trades</th>
+      <th>Open</th>
+      <th>SL</th>
+      <th>BE</th>
+      <th>Open %</th>
+      <th>Net R</th>`;
+  } else {
+    html += `
+      <th>Label</th>
+      <th>Evaluated</th>
+      <th>W</th>
+      <th>L</th>
+      <th>Inc</th>
+      <th>Win Rate</th>
+      <th>Net RR</th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const row of rows) {
+    if (isUntpOv) {
+      const openPct  = row.open_rate != null ? row.open_rate.toFixed(1) + '%' : '—';
+      const openCls  = row.open_count  > 0 ? 'hr-open' : 'hr-zero';
+      const slCls    = row.sl_count    > 0 ? 'hr-sl'   : 'hr-zero';
+      const beCls    = row.be_count    > 0 ? 'hr-be'   : 'hr-zero';
+      const netCls   = row.net_rr > 0 ? 'hr-net-pos' : row.net_rr < 0 ? 'hr-net-neg' : 'hr-net-zero';
+      const netStr   = (row.net_rr >= 0 ? '+' : '') + row.net_rr.toFixed(2) + 'R';
+
+      html += `<tr>
+        <td>${escHtml(row.label)}</td>
+        <td class="hr-dim">${row.total}</td>
+        <td class="${openCls}">${row.open_count}</td>
+        <td class="${slCls}">${row.sl_count}</td>
+        <td class="${beCls}">${row.be_count}</td>
+        <td class="hr-open">${openPct}</td>
+        <td class="${netCls}">${netStr}</td>
+      </tr>`;
+    } else {
+      const wrStr  = row.win_rate != null ? row.win_rate.toFixed(1) + '%' : '—';
+      const wrCls  = row.win_rate == null ? 'hr-wr-none'
+                   : row.win_rate >= 50   ? 'hr-wr-high' : 'hr-wr-low';
+      const netCls = row.net_rr > 0 ? 'hr-net-pos' : row.net_rr < 0 ? 'hr-net-neg' : 'hr-net-zero';
+      const netStr = (row.net_rr >= 0 ? '+' : '') + row.net_rr.toFixed(2) + 'R';
+      const wCls   = row.wins    > 0 ? 'hr-wr-high' : 'hr-zero';
+      const lCls   = row.losses  > 0 ? 'hr-sl'      : 'hr-zero';
+      const iCls   = row.inconclusive > 0 ? 'hr-dim' : 'hr-zero';
+
+      html += `<tr>
+        <td>${escHtml(row.label)}</td>
+        <td class="hr-dim">${row.total}</td>
+        <td class="${wCls}">${row.wins}</td>
+        <td class="${lCls}">${row.losses}</td>
+        <td class="${iCls}">${row.inconclusive}</td>
+        <td class="${wrCls}">${wrStr}</td>
+        <td class="${netCls}">${netStr}</td>
+      </tr>`;
+    }
+  }
+
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+</script>

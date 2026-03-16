@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Statistics — Backtrack</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #07090f;
+      --bg-card:     #0d1117;
+      --bg-input:    #0a0d14;
+      --bg-hover:    #131a24;
+      --border:      rgba(255,255,255,0.07);
+      --border-hi:   rgba(255,255,255,0.15);
+      --text:        #cdd9e5;
+      --text-dim:    #4d5b6b;
+      --text-mid:    #768898;
+      --accent:      #1f6feb;
+      --accent-glow: rgba(31,111,235,0.2);
+      --win:         #3fb950;
+      --win-dim:     rgba(63,185,80,0.15);
+      --loss:        #f85149;
+      --loss-dim:    rgba(248,81,73,0.15);
+      --be:          #d29922;
+      --be-dim:      rgba(210,153,34,0.15);
+      --open:        #58a6ff;
+      --open-dim:    rgba(88,166,255,0.15);
+      --neutral:     #58a6ff;
+      --mono:        'IBM Plex Mono', monospace;
+      --sans:        'IBM Plex Sans', sans-serif;
+      --radius:      6px;
+      --transition:  150ms ease;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── NAV ── */
+    nav {
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 24px; height: 52px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .nav-logo {
+      font-family: var(--mono); font-size: 13px; font-weight: 600;
+      color: var(--text); letter-spacing: 0.08em;
+      text-transform: uppercase; text-decoration: none;
+    }
+    .nav-sep { color: var(--border-hi); margin: 0 2px; }
+    .nav-links { display: flex; gap: 4px; margin-left: auto; }
+    .nav-link {
+      padding: 5px 12px; border-radius: var(--radius);
+      color: var(--text-mid); text-decoration: none;
+      font-size: 13px; transition: var(--transition);
+    }
+    .nav-link:hover { background: var(--bg-hover); color: var(--text); }
+    .nav-link.active { background: var(--accent-glow); color: var(--neutral); }
+
+    /* ── LAYOUT ── */
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      min-height: calc(100vh - 52px);
+    }
+
+    /* ── FILTER PANEL ── */
+    .filter-panel {
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      padding: 20px 16px;
+      position: sticky; top: 52px;
+      height: calc(100vh - 52px);
+      overflow-y: auto;
+      display: flex; flex-direction: column; gap: 0;
+    }
+    .filter-panel::-webkit-scrollbar { width: 4px; }
+    .filter-panel::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+
+    .filter-section {
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .filter-section:last-of-type { border-bottom: none; }
+    .filter-label {
+      font-family: var(--mono); font-size: 10px; font-weight: 600;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--text-dim); margin-bottom: 10px; display: block;
+    }
+
+    .channel-list {
+      display: flex; flex-direction: column; gap: 4px;
+      max-height: 200px; overflow-y: auto;
+    }
+    .channel-list::-webkit-scrollbar { width: 3px; }
+    .channel-list::-webkit-scrollbar-thumb { background: var(--border-hi); }
+    .channel-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; border-radius: 4px;
+      cursor: pointer; transition: var(--transition);
+    }
+    .channel-item:hover { background: var(--bg-hover); }
+    .channel-item input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
+    .channel-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .channel-name { font-size: 13px; color: var(--text); }
+
+    .period-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+    .chip {
+      padding: 3px 9px; border-radius: 20px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--text-mid); font-size: 12px;
+      cursor: pointer; transition: var(--transition); font-family: var(--sans);
+    }
+    .chip:hover { border-color: var(--border-hi); color: var(--text); }
+    .chip.active { background: var(--accent-glow); border-color: var(--accent); color: var(--neutral); }
+
+    .date-range {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px;
+    }
+
+    select, input[type="text"], input[type="number"], input[type="date"] {
+      width: 100%;
+      background: var(--bg-input); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--text);
+      font-family: var(--sans); font-size: 13px; padding: 7px 10px;
+      transition: var(--transition); outline: none; appearance: none;
+    }
+    select { cursor: pointer; }
+    select:focus, input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    select:disabled, input:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .radio-group { display: flex; flex-direction: column; gap: 6px; }
+    .radio-item { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .radio-item input[type="radio"] { accent-color: var(--accent); cursor: pointer; }
+    .radio-item label { font-size: 13px; color: var(--text); cursor: pointer; }
+
+    /* TP value row */
+    .tp-value-row { display: none; margin-top: 10px; }
+    .tp-value-row.visible { display: block; }
+
+    /* R / Pips pill toggle */
+    .unit-pills {
+      display: none; gap: 0;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      overflow: hidden; margin-top: 8px;
+    }
+    .unit-pills.visible { display: flex; }
+    .unit-pill {
+      flex: 1; padding: 5px 0; text-align: center;
+      font-family: var(--mono); font-size: 11px; font-weight: 600;
+      letter-spacing: 0.06em; cursor: pointer;
+      background: transparent; border: none;
+      color: var(--text-mid); transition: var(--transition);
+    }
+    .unit-pill.active { background: var(--accent-glow); color: var(--neutral); }
+    .unit-pill:first-child { border-right: 1px solid var(--border); }
+
+    /* Time limit section */
+    .time-limit-wrap.disabled select { opacity: 0.35; pointer-events: none; cursor: not-allowed; }
+    .filter-hint { font-size: 11px; color: var(--text-dim); margin-top: 6px; line-height: 1.4; }
+
+    /* BE filter toggle — visible only for untp_overview */
+    #be-filter-section { display: none; }
+
+    /* Run button */
+    .run-btn {
+      margin-top: 16px; width: 100%; padding: 10px;
+      background: var(--accent); border: none; border-radius: var(--radius);
+      color: #fff; font-family: var(--sans); font-size: 14px;
+      font-weight: 600; cursor: pointer; transition: var(--transition);
+      letter-spacing: 0.02em;
+    }
+    .run-btn:hover { background: #388bfd; }
+    .run-btn:active { transform: scale(0.98); }
+    .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .run-btn .spinner {
+      display: none; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.6s linear infinite;
+      vertical-align: middle; margin-right: 6px;
+    }
+    .run-btn.loading .spinner { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── MAIN ── */
+    .main { padding: 24px; overflow-y: auto; }
+
+    .module-tabs {
+      display: flex; gap: 2px;
+      border-bottom: 1px solid var(--border); margin-bottom: 24px;
+    }
+    .tab-btn {
+      padding: 8px 16px; background: transparent; border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-mid); font-family: var(--sans);
+      font-size: 13px; cursor: pointer; transition: var(--transition);
+      margin-bottom: -1px;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--neutral); border-bottom-color: var(--accent); }
+    .tab-btn.disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 80px 24px;
+      text-align: center; gap: 12px;
+    }
+    .empty-icon { font-size: 40px; opacity: 0.25; }
+    .empty-title { font-size: 16px; font-weight: 500; color: var(--text-mid); }
+    .empty-sub { font-size: 13px; color: var(--text-dim); max-width: 320px; }
+
+    /* ─── SHARED RESULT PANEL VISIBILITY ─── */
+    #panel-overview,
+    #panel-untp { display: none; }
+
+    .alert {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 14px; border-radius: var(--radius);
+      font-size: 13px; margin-bottom: 20px;
+    }
+    .alert-warning {
+      background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.3);
+      color: #e3b341;
+    }
+    .alert-info {
+      background: rgba(31,111,235,0.1); border: 1px solid rgba(31,111,235,0.3);
+      color: var(--neutral);
+    }
+    .alert-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+
+    /* Stat cards */
+    .stat-cards {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 12px; margin-bottom: 20px;
+    }
+    .stat-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px;
+      position: relative; overflow: hidden;
+    }
+    .stat-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0;
+      height: 2px; background: var(--border-hi);
+    }
+    .stat-card.win::before     { background: var(--win); }
+    .stat-card.loss::before    { background: var(--loss); }
+    .stat-card.accent::before  { background: var(--accent); }
+    .stat-card.neutral::before { background: var(--neutral); }
+    .stat-card.be::before      { background: var(--be); }
+    .stat-card.open::before    { background: var(--open); }
+
+    .stat-label {
+      font-family: var(--mono); font-size: 10px; font-weight: 500;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--text-dim); margin-bottom: 8px;
+    }
+    .stat-value {
+      font-family: var(--mono); font-size: 26px; font-weight: 600;
+      line-height: 1; color: var(--text);
+    }
+    .stat-value.positive { color: var(--win); }
+    .stat-value.negative { color: var(--loss); }
+    .stat-value.open-col { color: var(--open); }
+    .stat-sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+    /* Counts row */
+    .counts-row {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 10px; margin-bottom: 20px;
+    }
+    .count-item {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 16px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .count-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .count-dot.win          { background: var(--win); }
+    .count-dot.loss         { background: var(--loss); }
+    .count-dot.inconclusive { background: var(--text-dim); }
+    .count-dot.excluded     { background: var(--be); }
+    .count-dot.open         { background: var(--open); }
+    .count-dot.sl           { background: var(--loss); }
+    .count-dot.be           { background: var(--be); }
+    .count-label { font-size: 12px; color: var(--text-mid); }
+    .count-num {
+      font-family: var(--mono); font-size: 18px; font-weight: 600;
+      margin-left: auto;
+    }
+    .count-num.win          { color: var(--win); }
+    .count-num.loss         { color: var(--loss); }
+    .count-num.inconclusive { color: var(--text-mid); }
+    .count-num.excluded     { color: var(--be); }
+    .count-num.open         { color: var(--open); }
+    .count-num.sl           { color: var(--loss); }
+    .count-num.be           { color: var(--be); }
+
+    /* Streak chips */
+    .streak-row { display: flex; gap: 10px; margin-bottom: 20px; }
+    .streak-chip {
+      padding: 6px 14px; border-radius: 20px;
+      font-family: var(--mono); font-size: 12px;
+      border: 1px solid var(--border);
+    }
+    .streak-chip.win-streak  { border-color: var(--win);  color: var(--win);  background: var(--win-dim); }
+    .streak-chip.loss-streak { border-color: var(--loss); color: var(--loss); background: var(--loss-dim); }
+    .streak-chip.open-streak { border-color: var(--open); color: var(--open); background: var(--open-dim); }
+    .streak-chip.sl-streak   { border-color: var(--loss); color: var(--loss); background: var(--loss-dim); }
+
+    /* Charts */
+    .charts-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 16px; margin-bottom: 20px;
+    }
+    .chart-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px;
+    }
+    .chart-title {
+      font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-dim); margin-bottom: 14px;
+    }
+    .chart-wrap { position: relative; height: 220px; }
+
+    /* Avg MFE/MAE row */
+    .mfe-mae-row {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    }
+    .mfe-mae-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 16px;
+    }
+    .mfe-mae-label {
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px;
+    }
+    .mfe-mae-value { font-family: var(--mono); font-size: 20px; font-weight: 600; }
+    .mfe-mae-value.mfe { color: var(--win); }
+    .mfe-mae-value.mae { color: var(--loss); }
+    .mfe-mae-value.dd  { color: var(--be); }
+
+    /* Section header */
+    .section-header {
+      display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px;
+    }
+    .section-title { font-size: 15px; font-weight: 500; color: var(--text); }
+    .section-meta  { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+    .section-divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+    /* Module placeholder */
+    .module-placeholder {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 60px 24px;
+      text-align: center; border: 1px dashed var(--border);
+      border-radius: var(--radius); gap: 10px;
+    }
+    .placeholder-label {
+      font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-dim);
+    }
+
+    .error-box {
+      background: var(--loss-dim); border: 1px solid rgba(248,81,73,0.3);
+      border-radius: var(--radius); padding: 14px 16px;
+      color: var(--loss); font-size: 13px;
+    }
+
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">Backtrack</a>
+  <span class="nav-sep">/</span>
+  <span style="font-size:13px; color:var(--text-mid);">Statistics</span>
+  <div class="nav-links">
+    <a href="/" class="nav-link">Monitor</a>
+    <a href="/channels" class="nav-link">Channels</a>
+    <a href="/statistics" class="nav-link active">Statistics</a>
+  </div>
+</nav>
+
+<div class="layout">
+
+  <!-- ── FILTER PANEL ─────────────────────────────────── -->
+  <aside class="filter-panel">
+
+    <!-- Channels -->
+    <div class="filter-section">
+      <span class="filter-label">Channels</span>
+      <div style="display:flex; gap:6px; margin-bottom:8px;">
+        <button class="chip active" onclick="selectAllChannels(true)">All</button>
+        <button class="chip" onclick="selectAllChannels(false)">None</button>
+      </div>
+      <div class="channel-list">
+        {% for ch in channels %}
+        <label class="channel-item">
+          <input type="checkbox" name="channel_ids" value="{{ ch.channel_id }}" checked>
+          <span class="channel-dot" data-color="{{ ch.color or '#4A90D9' }}"></span>
+          <span class="channel-name">{{ ch.name }}</span>
+        </label>
+        {% else %}
+        <span style="font-size:12px; color:var(--text-dim); padding:4px 8px;">No channels yet</span>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Time period -->
+    <div class="filter-section">
+      <span class="filter-label">Time Period</span>
+      <div class="period-chips">
+        <button class="chip active" data-period="all"    onclick="setPeriod(this)">All time</button>
+        <button class="chip"        data-period="30d"    onclick="setPeriod(this)">30d</button>
+        <button class="chip"        data-period="90d"    onclick="setPeriod(this)">90d</button>
+        <button class="chip"        data-period="6mo"    onclick="setPeriod(this)">6mo</button>
+        <button class="chip"        data-period="1yr"    onclick="setPeriod(this)">1yr</button>
+        <button class="chip"        data-period="custom" onclick="setPeriod(this)">Custom</button>
+      </div>
+      <div class="date-range" id="custom-date-range" style="display:none;">
+        <div>
+          <div style="font-size:11px; color:var(--text-dim); margin-bottom:4px;">From</div>
+          <input type="date" id="date-from">
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--text-dim); margin-bottom:4px;">To</div>
+          <input type="date" id="date-to">
+        </div>
+      </div>
+    </div>
+
+    <!-- Symbol -->
+    <div class="filter-section">
+      <span class="filter-label">Symbol</span>
+      <select id="filter-symbol">
+        <option value="all">All symbols</option>
+        {% for sym in symbols %}
+        <option value="{{ sym }}">{{ sym }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Trade direction — DECISION-17: 7 individual types -->
+    <div class="filter-section">
+      <span class="filter-label">Trade Direction</span>
+      <div class="radio-group">
+        <label class="radio-item"><input type="radio" name="trade_type" value="all" checked><label>All</label></label>
+        <label class="radio-item"><input type="radio" name="trade_type" value="buy"><label>Buy</label></label>
+        <label class="radio-item"><input type="radio" name="trade_type" value="sell"><label>Sell</label></label>
+        <label class="radio-item"><input type="radio" name="trade_type" value="limit_buy"><label>Limit Buy</label></label>
+        <label class="radio-item"><input type="radio" name="trade_type" value="limit_sell"><label>Limit Sell</label></label>
+        <label class="radio-item"><input type="radio" name="trade_type" value="stop_buy"><label>Stop Buy</label></label>
+        <label class="radio-item"><input type="radio" name="trade_type" value="stop_sell"><label>Stop Sell</label></label>
+      </div>
+    </div>
+
+    <!-- TP Evaluation — DECISION-15: 4 modes -->
+    <div class="filter-section">
+      <span class="filter-label">TP Evaluation</span>
+      <div class="radio-group">
+        <label class="radio-item">
+          <input type="radio" name="tp_mode" value="original_tp" checked onchange="onTpModeChange(this)">
+          <label>Original TP</label>
+        </label>
+        <label class="radio-item">
+          <input type="radio" name="tp_mode" value="fixed_tp" onchange="onTpModeChange(this)">
+          <label>Fixed Target (Trade Walk)</label>
+        </label>
+        <label class="radio-item">
+          <input type="radio" name="tp_mode" value="fixed_untp" onchange="onTpModeChange(this)">
+          <label>Fixed Target (UNTP)</label>
+        </label>
+        <label class="radio-item">
+          <input type="radio" name="tp_mode" value="untp_overview" onchange="onTpModeChange(this)">
+          <label>UNTP Overview</label>
+        </label>
+      </div>
+
+      <!-- R/Pips toggle — fixed_tp and fixed_untp only -->
+      <div class="unit-pills" id="unit-pills">
+        <button class="unit-pill active" id="pill-r"    onclick="setUnit('R')">R</button>
+        <button class="unit-pill"        id="pill-pips" onclick="setUnit('pips')">PIPS</button>
+      </div>
+
+      <!-- Target input — fixed_tp and fixed_untp only -->
+      <div class="tp-value-row" id="tp-value-row">
+        <input type="number" id="tp-value" min="0.1" step="0.1" placeholder="e.g. 2.0">
+      </div>
+    </div>
+
+    <!-- Time limit — disabled for original_tp / fixed_tp -->
+    <div class="filter-section">
+      <span class="filter-label">UNTP Time Limit</span>
+      <div class="time-limit-wrap disabled" id="time-limit-wrap">
+        <select id="time-limit">
+          {% for opt in time_limit_options %}
+          <option value="{{ opt.value }}">{{ opt.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-hint" id="time-limit-hint">Not used for this mode.</div>
+    </div>
+
+    <!-- BE Filter — untp_overview only, client-side toggle -->
+    <div class="filter-section" id="be-filter-section">
+      <span class="filter-label">BE Filter</span>
+      <div class="radio-group">
+        <label class="radio-item">
+          <input type="radio" name="be_filter" value="all" checked onchange="onBeFilterChange(this)">
+          <label>All trades</label>
+        </label>
+        <label class="radio-item">
+          <input type="radio" name="be_filter" value="be_active" onchange="onBeFilterChange(this)">
+          <label>BE Active only</label>
+        </label>
+        <label class="radio-item">
+          <input type="radio" name="be_filter" value="no_be" onchange="onBeFilterChange(this)">
+          <label>No BE only</label>
+        </label>
+      </div>
+      <div class="filter-hint">Filters by breakeven_triggered state. No server re-fetch.</div>
+    </div>
+
+    <button class="run-btn" id="run-btn" onclick="runStatistics()">
+      <span class="spinner"></span>
+      Run Statistics
+    </button>
+
+  </aside>
+
+  <!-- ── MAIN CONTENT ──────────────────────────────────── -->
+  <main class="main">
+
+    <div class="module-tabs">
+      <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview', this)">M1 · Overview</button>
+      <button class="tab-btn" data-tab="hitrate" onclick="switchTab('hitrate', this)">M2 · Hit Rate</button>
+      <button class="tab-btn disabled" data-tab="sweep"   title="Phase 8">M3 · RR Sweep</button>
+      <button class="tab-btn disabled" data-tab="becompare"   title="Phase 6">M4 · BE Compare</button>
+      <button class="tab-btn disabled" data-tab="dip"     title="Phase 7">M5 · Dip Analysis</button>
+      <button class="tab-btn disabled" data-tab="strategy" title="Phase 7">M6 · Strategy Card</button>
+      <button class="tab-btn" data-tab="pnl" onclick="switchTab('pnl', this)">M7 · PnL Report</button>
+    </div>
+
+    {% include 'partials/stats_m1_overview.html' %}
+    {% include 'partials/stats_m2_hitrate.html' %}
+    {% include 'partials/stats_m3_sweep.html' %}
+    {% include 'partials/stats_m4_becompare.html' %}
+    {% include 'partials/stats_m5_dip.html' %}
+    {% include 'partials/stats_m6_strategy.html' %}
+    {% include 'partials/stats_m7_pnl.html' %}
+
+  </main>
+</div>
+
+<script>
+document.querySelectorAll('.channel-dot[data-color]').forEach(el => {
+  el.style.background = el.dataset.color;
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SHARED STATE
+// ═══════════════════════════════════════════════════════════════
+let activePeriod  = 'all';
+let activeUnit    = 'R';
+let activeBe      = 'all';   // 'all' | 'be_active' | 'no_be' — client-side only
+let lastUntpData  = null;    // stored so BE toggle doesn't need a server re-fetch
+
+// ═══════════════════════════════════════════════════════════════
+// TAB SWITCHING
+// ═══════════════════════════════════════════════════════════════
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('tab-' + name);
+  if (pane) pane.classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CHANNEL SELECTORS
+// ═══════════════════════════════════════════════════════════════
+function selectAllChannels(checked) {
+  document.querySelectorAll('[name="channel_ids"]').forEach(cb => cb.checked = checked);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TIME PERIOD
+// ═══════════════════════════════════════════════════════════════
+function setPeriod(btn) {
+  document.querySelectorAll('.chip[data-period]').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  activePeriod = btn.dataset.period;
+  document.getElementById('custom-date-range').style.display =
+    activePeriod === 'custom' ? 'grid' : 'none';
+}
+
+function getPeriodDates() {
+  if (activePeriod === 'all') return { date_from: null, date_to: null };
+  if (activePeriod === 'custom') {
+    return {
+      date_from: document.getElementById('date-from').value || null,
+      date_to:   document.getElementById('date-to').value   || null,
+    };
+  }
+  const now  = new Date();
+  const to   = now.toISOString().slice(0, 10);
+  const days = { '30d':30, '90d':90, '6mo':180, '1yr':365 }[activePeriod] || 0;
+  const from = new Date(now.getTime() - days * 86400000);
+  return { date_from: from.toISOString().slice(0, 10), date_to: to };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UNIT TOGGLE (R / PIPS)
+// ═══════════════════════════════════════════════════════════════
+function setUnit(unit) {
+  activeUnit = unit;
+  document.getElementById('pill-r').classList.toggle('active', unit === 'R');
+  document.getElementById('pill-pips').classList.toggle('active', unit === 'pips');
+  document.getElementById('tp-value').placeholder = unit === 'R' ? 'e.g. 2.0' : 'e.g. 20';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TP MODE CHANGE
+// ═══════════════════════════════════════════════════════════════
+function onTpModeChange(radio) {
+  const mode        = radio.value;
+  const needsTarget = mode === 'fixed_tp' || mode === 'fixed_untp';
+  const needsLimit  = mode === 'fixed_untp' || mode === 'untp_overview';
+  const isUntpOv    = mode === 'untp_overview';
+
+  document.getElementById('tp-value-row').classList.toggle('visible', needsTarget);
+  document.getElementById('unit-pills').classList.toggle('visible', needsTarget);
+
+  const wrap = document.getElementById('time-limit-wrap');
+  const sel  = document.getElementById('time-limit');
+  wrap.classList.toggle('disabled', !needsLimit);
+  sel.disabled = !needsLimit;
+  document.getElementById('time-limit-hint').textContent = needsLimit
+    ? 'Required: select the UNTP checkpoint window.'
+    : 'Not used for this mode.';
+
+  // BE filter section — untp_overview only
+  document.getElementById('be-filter-section').style.display = isUntpOv ? 'block' : 'none';
+
+  if (!isUntpOv) {
+    activeBe = 'all';
+    const allRadio = document.querySelector('[name="be_filter"][value="all"]');
+    if (allRadio) allRadio.checked = true;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BE FILTER CHANGE — client-side only, no server call
+// ═══════════════════════════════════════════════════════════════
+function onBeFilterChange(radio) {
+  activeBe = radio.value;
+  if (lastUntpData) renderUntpStats(lastUntpData);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BUILD PAYLOAD
+// ═══════════════════════════════════════════════════════════════
+function buildPayload() {
+  const channelIds = Array.from(
+    document.querySelectorAll('[name="channel_ids"]:checked')
+  ).map(cb => parseInt(cb.value));
+
+  const tpMode      = document.querySelector('[name="tp_mode"]:checked')?.value || 'original_tp';
+  const needsTarget = tpMode === 'fixed_tp' || tpMode === 'fixed_untp';
+  const needsLimit  = tpMode === 'fixed_untp' || tpMode === 'untp_overview';
+
+  const tpInput        = document.getElementById('tp-value').value;
+  const tpValue        = (needsTarget && tpInput) ? parseFloat(tpInput) : null;
+  const unit           = needsTarget ? activeUnit : 'R';
+  const tlRaw          = document.getElementById('time-limit').value;
+  const timeLimitHours = (needsLimit && tlRaw) ? parseFloat(tlRaw) : null;
+
+  return {
+    channel_ids:      channelIds,
+    tp_mode:          tpMode,
+    tp_value:         tpValue,
+    unit:             unit,
+    time_limit_hours: timeLimitHours,
+    trade_type:       document.querySelector('[name="trade_type"]:checked')?.value || 'all',
+    symbol:           document.getElementById('filter-symbol').value,
+    ...getPeriodDates(),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RUN STATISTICS
+// ═══════════════════════════════════════════════════════════════
+async function runStatistics() {
+  const btn    = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.classList.add('loading');
+
+  const tpMode = document.querySelector('[name="tp_mode"]:checked')?.value;
+  if ((tpMode === 'fixed_untp' || tpMode === 'untp_overview') &&
+      !document.getElementById('time-limit').value) {
+    showError('A time limit (UNTP checkpoint) is required for this mode.');
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    return;
+  }
+
+  try {
+    const payload = buildPayload();
+    const fetchOpts = {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    };
+
+    const [ovResp, hrResp, pnlResp] = await Promise.all([
+      fetch('/statistics/overview', fetchOpts),
+      fetch('/statistics/hitrate',  fetchOpts),
+      fetch('/statistics/pnl',      fetchOpts),
+    ]);
+
+    if (!ovResp.ok) {
+      const err = await ovResp.json().catch(() => ({ error: 'Server error' }));
+      showError(err.error || `HTTP ${ovResp.status}`);
+      return;
+    }
+
+    const data = await ovResp.json();
+    if (data.result_type === 'untp_stats') {
+      lastUntpData = data;
+      renderUntpStats(data);
+    } else {
+      lastUntpData = null;
+      renderOverview(data);
+    }
+
+    if (hrResp.ok) {
+      const hrData = await hrResp.json();
+      if (typeof renderHitRate === 'function') renderHitRate(hrData);
+    }
+
+  if (pnlResp.ok) {
+      const pnlData = await pnlResp.json();
+      if (typeof renderPnlReport === 'function') renderPnlReport(pnlData);
+    }
+
+  } catch (err) {
+    showError(err.message || 'Network error');
+  } finally {
+    
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SHARED CHART RENDERER
+// Used by M1, M7, and any future module that draws a Chart.js line
+// ═══════════════════════════════════════════════════════════════
+const _chartBase = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#1c2333', borderColor: 'rgba(255,255,255,0.1)',
+      borderWidth: 1, titleColor: '#cdd9e5', bodyColor: '#768898', padding: 10,
+    },
+  },
+  scales: {
+    x: {
+      ticks: { color: '#4d5b6b', maxTicksLimit: 6, font: { family: "'IBM Plex Mono'", size: 10 } },
+      grid:  { color: 'rgba(255,255,255,0.04)' },
+      border:{ color: 'rgba(255,255,255,0.07)' },
+    },
+    y: {
+      ticks: { color: '#4d5b6b', font: { family: "'IBM Plex Mono'", size: 10 } },
+      grid:  { color: 'rgba(255,255,255,0.04)' },
+      border:{ color: 'rgba(255,255,255,0.07)' },
+    },
+  },
+};
+
+function renderChart(canvasId, curveData, type, existingChart, setter) {
+  const labels = curveData.map(p => p[0]);
+  const values = curveData.map(p => p[1]);
+
+  let lineColor, fillColor;
+  if (type === 'drawdown') {
+    lineColor = '#f85149';
+    fillColor = 'rgba(248,81,73,0.07)';
+  } else {
+    const final = values.length ? values[values.length - 1] : 0;
+    lineColor   = final >= 0 ? '#3fb950' : '#f85149';
+    fillColor   = final >= 0 ? 'rgba(63,185,80,0.08)' : 'rgba(248,81,73,0.08)';
+  }
+
+  if (existingChart) existingChart.destroy();
+
+  const opts = JSON.parse(JSON.stringify(_chartBase));
+  opts.plugins.tooltip.callbacks = {
+    label: ctx => ` ${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y.toFixed(2)}R`,
+  };
+
+  const chart = new Chart(document.getElementById(canvasId).getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: values, borderColor: lineColor, backgroundColor: fillColor,
+        borderWidth: 1.5, fill: true, tension: 0.3,
+        pointRadius: values.length > 60 ? 0 : 2, pointHoverRadius: 4,
+      }],
+    },
+    options: opts,
+  });
+
+  setter(chart);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ERROR DISPLAY
+// ═══════════════════════════════════════════════════════════════
+function showError(msg) {
+  document.getElementById('empty-state').style.display    = 'none';
+  document.getElementById('panel-overview').style.display = 'block';
+  document.getElementById('panel-untp').style.display     = 'none';
+  document.getElementById('ov-banner').innerHTML = `
+    <div class="error-box"><strong>Error:</strong> ${escHtml(msg)}</div>`;
+  document.getElementById('ov-meta').textContent = '';
+  ['ov-winrate','ov-netrr','ov-exp','ov-avgwin','ov-avgloss'].forEach(id => {
+    document.getElementById(id).textContent = '—';
+  });
+}
+
+function escHtml(str) {
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(str));
+  return d.innerHTML;
+}
+
+// Enter key in target input → run
+document.getElementById('tp-value').addEventListener('keydown', e => {
+  if (e.key === 'Enter') runStatistics();
+});
+</script>
+</body>
+</html>

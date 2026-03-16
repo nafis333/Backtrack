@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Channels — Backtest System</title>
+  <style>
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --surface2:  #22263a;
+      --border:    #2e3348;
+      --accent:    #4A90D9;
+      --accent2:   #6ab0f5;
+      --text:      #e8eaf6;
+      --muted:     #8891b4;
+      --success:   #4caf7d;
+      --warn:      #f5a623;
+      --danger:    #e05c5c;
+      --radius:    10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* ── NAV ── */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 52px;
+    }
+    .nav-brand {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent2);
+      text-decoration: none;
+      margin-right: 16px;
+    }
+    .nav-link {
+      color: var(--muted);
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      transition: background .15s, color .15s;
+    }
+    .nav-link:hover, .nav-link.active {
+      background: var(--surface2);
+      color: var(--text);
+    }
+
+    /* ── LAYOUT ── */
+    .page { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
+
+    /* ── PAGE HEADER ── */
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .page-title { font-size: 22px; font-weight: 700; }
+    .page-actions { display: flex; gap: 10px; align-items: center; }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 7px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: opacity .15s, filter .15s;
+    }
+    .btn:hover { filter: brightness(1.12); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); }
+    .btn-danger-outline {
+      background: transparent;
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+    .btn-sm { padding: 5px 11px; font-size: 12px; }
+
+    /* ── ARCHIVED TOGGLE ── */
+    .archived-toggle {
+      font-size: 12px;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      transition: background .15s;
+    }
+    .archived-toggle:hover { background: var(--surface2); color: var(--text); }
+
+    /* ── CHANNEL GRID ── */
+    .channel-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    /* ── CHANNEL CARD ── */
+    .channel-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: border-color .15s, transform .1s;
+    }
+    .channel-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .channel-card.archived { opacity: .6; }
+
+    .card-stripe {
+      height: 4px;
+      width: 100%;
+    }
+    .card-body {
+      padding: 18px 18px 14px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .card-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .card-name:hover { color: var(--accent2); }
+    .card-desc {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .meta-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 3px 9px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .meta-chip.warn       { border-color: var(--warn);    color: var(--warn); }
+    .meta-chip.chip-pos   { border-color: var(--success); color: var(--success); font-weight: 600; }
+    .meta-chip.chip-neg   { border-color: var(--danger);  color: var(--danger);  font-weight: 600; }
+    .meta-chip.archived-tag { border-color: var(--muted); }
+
+    .symbols-list {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .symbol-tag {
+      display: inline-block;
+      background: var(--surface2);
+      border-radius: 4px;
+      padding: 2px 7px;
+      margin: 2px 2px 2px 0;
+      font-size: 11px;
+      color: var(--accent2);
+    }
+
+    .card-actions {
+      padding: 10px 18px 14px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── EMPTY STATE ── */
+    .empty-state {
+      text-align: center;
+      padding: 64px 24px;
+      color: var(--muted);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: var(--text); }
+    .empty-state p { font-size: 13px; max-width: 360px; margin: 0 auto 20px; }
+
+    /* ── MODALS ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 440px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .modal h3 { font-size: 16px; font-weight: 700; }
+    .modal-body { display: flex; flex-direction: column; gap: 12px; }
+    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; }
+
+    label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+    input[type="text"], textarea, select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text);
+      padding: 8px 12px;
+      font-size: 13px;
+      outline: none;
+      font-family: inherit;
+    }
+    input[type="text"]:focus, textarea:focus, select:focus {
+      border-color: var(--accent);
+    }
+    .color-row { display: flex; gap: 10px; align-items: center; }
+    input[type="color"] {
+      width: 40px; height: 36px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      cursor: pointer;
+      padding: 2px;
+    }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 18px;
+      font-size: 13px;
+      min-width: 260px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.4);
+      animation: slideIn .2s ease;
+    }
+    .toast-item.success { border-color: var(--success); }
+    .toast-item.error   { border-color: var(--danger); }
+    @keyframes slideIn { from { transform: translateX(40px); opacity: 0; } }
+
+    /* ── CONFIRM MODAL ── */
+    .confirm-modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 380px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .confirm-modal p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="nav-brand">📈 Backtest</a>
+  <a href="/" class="nav-link">Monitor</a>
+  <a href="/channels" class="nav-link active">Channels</a>
+</nav>
+
+<div class="page">
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <h1 class="page-title">
+      {% if show_archived %}Archived Channels{% else %}Channels{% endif %}
+    </h1>
+    <div class="page-actions">
+      {% if show_archived %}
+        <a href="/channels" class="archived-toggle">← Active channels</a>
+      {% else %}
+        <a href="/channels?archived=1" class="archived-toggle">Show archived</a>
+        <button class="btn btn-primary" onclick="openCreateModal()">＋ New Channel</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- CHANNEL GRID -->
+  {% if metas %}
+  <div class="channel-grid">
+    {% for m in metas %}
+    <div class="channel-card {% if m.is_archived %}archived{% endif %}" id="card-{{ m.channel_id }}">
+      <div class="card-stripe" data-color="{{ m.color }}"></div>
+      <div class="card-body">
+        <a href="/channels/{{ m.channel_id }}" class="card-name">{{ m.name }}</a>
+        {% if m.description %}
+          <p class="card-desc">{{ m.description }}</p>
+        {% endif %}
+
+        <div class="card-meta">
+          <span class="meta-chip">{{ m.trade_count }} trade{% if m.trade_count != 1 %}s{% endif %}</span>
+          {% if m.evaluated_count > 0 %}
+            <span class="meta-chip {% if m.win_rate >= 50 %}chip-pos{% elif m.win_rate < 50 %}chip-neg{% endif %}">
+              {{ m.win_rate }}% WR
+            </span>
+            <span class="meta-chip {% if m.net_r > 0 %}chip-pos{% elif m.net_r < 0 %}chip-neg{% endif %}">
+              {{ '+' if m.net_r > 0 else '' }}{{ '%.2f'|format(m.net_r) }}R
+            </span>
+          {% endif %}
+          {% if m.date_from %}
+            <span class="meta-chip">{{ m.date_from.strftime('%d %b %Y') }} – {{ m.date_to.strftime('%d %b %Y') }}</span>
+          {% endif %}
+          {% if m.is_archived %}
+            <span class="meta-chip archived-tag">Archived</span>
+          {% endif %}
+          {% if m.has_bad_trades %}
+            <span class="meta-chip warn">⚠ {{ m.bad_trade_count }} incomplete</span>
+          {% endif %}
+        </div>
+
+        {% if m.symbols %}
+        <div>
+          {% for s in m.symbols[:8] %}
+            <span class="symbol-tag">{{ s }}</span>
+          {% endfor %}
+          {% if m.symbols|length > 8 %}
+            <span class="meta-chip">+{{ m.symbols|length - 8 }} more</span>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="card-actions">
+        <a href="/channels/{{ m.channel_id }}" class="btn btn-ghost btn-sm">View</a>
+        {% if not m.is_archived %}
+          <button class="btn btn-ghost btn-sm"
+                  data-action="rename"
+                  data-id="{{ m.channel_id }}"
+                  data-name="{{ m.name|e }}">Rename</button>
+          <button class="btn btn-ghost btn-sm"
+                  data-action="archive"
+                  data-id="{{ m.channel_id }}"
+                  data-name="{{ m.name|e }}">Archive</button>
+        {% else %}
+          <button class="btn btn-ghost btn-sm"
+                  data-action="unarchive"
+                  data-id="{{ m.channel_id }}">Unarchive</button>
+        {% endif %}
+        <button class="btn btn-danger-outline btn-sm"
+                data-action="delete"
+                data-id="{{ m.channel_id }}"
+                data-name="{{ m.name|e }}"
+                data-count="{{ m.trade_count }}">Delete</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <div class="icon">📂</div>
+    <h3>{% if show_archived %}No archived channels{% else %}No channels yet{% endif %}</h3>
+    <p>{% if not show_archived %}Save your first trade from the monitor results page to create a channel.{% endif %}</p>
+    {% if not show_archived %}
+      <button class="btn btn-primary" onclick="openCreateModal()">＋ New Channel</button>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── CREATE CHANNEL MODAL ── -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal">
+    <h3>New Channel</h3>
+    <div class="modal-body">
+      <div>
+        <label>Channel Name *</label>
+        <input type="text" id="create-name" placeholder="e.g. EURUSD London Scalps" maxlength="120"/>
+      </div>
+      <div>
+        <label>Description (optional)</label>
+        <textarea id="create-desc" rows="2" maxlength="500" placeholder="What trades go here?"></textarea>
+      </div>
+      <div>
+        <label>Colour</label>
+        <div class="color-row">
+          <input type="color" id="create-color" value="#4A90D9"/>
+          <span style="font-size:12px;color:var(--muted)">Used as card accent stripe</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('createModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreate()">Create Channel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── RENAME MODAL ── -->
+<div class="modal-overlay" id="renameModal">
+  <div class="modal">
+    <h3>Rename Channel</h3>
+    <div class="modal-body">
+      <div>
+        <label>New Name *</label>
+        <input type="text" id="rename-input" maxlength="120"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('renameModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitRename()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── DELETE CONFIRM MODAL ── -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="confirm-modal">
+    <h3>Delete Channel</h3>
+    <p id="delete-msg"></p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('deleteModal')">Cancel</button>
+      <button class="btn btn-danger-outline" id="delete-confirm-btn" onclick="submitDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div id="toast"></div>
+
+<script>
+  let _renameId = null;
+  let _deleteId = null;
+
+  // ── APPLY DATA-COLOR STRIPES ───────────────────────────────
+  document.querySelectorAll('.card-stripe[data-color]').forEach(el => {
+    el.style.background = el.dataset.color;
+  });
+
+  // ── EVENT DELEGATION FOR CARD BUTTONS ─────────────────────
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const id     = parseInt(btn.dataset.id, 10);
+    const name   = btn.dataset.name  || '';
+    const count  = parseInt(btn.dataset.count || '0', 10);
+
+    if (action === 'rename')    openRenameModal(id, name);
+    if (action === 'archive')   archiveChannel(id, name);
+    if (action === 'unarchive') unarchiveChannel(id);
+    if (action === 'delete')    openDeleteModal(id, name, count);
+  });
+
+  // ── MODAL HELPERS ──────────────────────────────────────────
+  function openModal(id) {
+    document.getElementById(id).classList.add('open');
+  }
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      ['createModal','renameModal','deleteModal'].forEach(closeModal);
+    }
+  });
+  ['createModal','renameModal','deleteModal'].forEach(id => {
+    document.getElementById(id).addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeModal(id);
+    });
+  });
+
+  // ── TOAST ─────────────────────────────────────────────────
+  function toast(msg, type='success') {
+    const el = document.createElement('div');
+    el.className = `toast-item ${type}`;
+    el.textContent = msg;
+    document.getElementById('toast').appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
+
+  // ── CREATE ────────────────────────────────────────────────
+  function openCreateModal() {
+    document.getElementById('create-name').value = '';
+    document.getElementById('create-desc').value = '';
+    document.getElementById('create-color').value = '#4A90D9';
+    openModal('createModal');
+    setTimeout(() => document.getElementById('create-name').focus(), 100);
+  }
+  async function submitCreate() {
+    const name  = document.getElementById('create-name').value.trim();
+    const desc  = document.getElementById('create-desc').value.trim();
+    const color = document.getElementById('create-color').value;
+    if (!name) { toast('Channel name is required.', 'error'); return; }
+
+    const btn = document.querySelector('#createModal .btn-primary');
+    if (btn.disabled) return;
+    btn.disabled = true; btn.textContent = 'Creating…';
+
+    const fd = new FormData();
+    fd.append('name', name);
+    fd.append('description', desc);
+    fd.append('color', color);
+
+    try {
+      const r = await fetch('/channels/create', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (d.success) {
+        toast('✅ Channel "' + name + '" created');
+        closeModal('createModal');
+        setTimeout(() => location.reload(), 600);
+      } else {
+        toast(d.error || 'Failed to create channel.', 'error');
+      }
+    } finally {
+      btn.disabled = false; btn.textContent = 'Create Channel';
+    }
+  }
+
+  // ── RENAME ────────────────────────────────────────────────
+  function openRenameModal(id, currentName) {
+    _renameId = id;
+    document.getElementById('rename-input').value = currentName;
+    openModal('renameModal');
+    setTimeout(() => document.getElementById('rename-input').focus(), 100);
+  }
+  async function submitRename() {
+    const name = document.getElementById('rename-input').value.trim();
+    if (!name) { toast('Name cannot be empty.', 'error'); return; }
+
+    const btn = document.querySelector('#renameModal .btn-primary');
+    if (btn.disabled) return;
+    btn.disabled = true; btn.textContent = 'Saving…';
+
+    const fd = new FormData();
+    fd.append('name', name);
+    try {
+      const r = await fetch('/channels/' + _renameId + '/rename', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (d.success) {
+        toast('✅ Channel renamed');
+        closeModal('renameModal');
+        setTimeout(() => location.reload(), 600);
+      } else {
+        toast(d.error || 'Failed to rename.', 'error');
+      }
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save';
+    }
+  }
+
+  // ── ARCHIVE ───────────────────────────────────────────────
+  async function archiveChannel(id, name) {
+    if (!confirm('Archive "' + name + '"? It will be hidden from the main list.')) return;
+    const card = document.getElementById('card-' + id);
+    const trigger = card ? card.querySelector('[data-action="archive"]') : null;
+    if (trigger) { trigger.disabled = true; }
+    try {
+      const r = await fetch('/channels/' + id + '/archive', { method: 'POST' });
+      const d = await r.json();
+      if (d.success) {
+        toast('📦 "' + name + '" archived');
+        if (card) card.remove();
+      } else {
+        toast(d.error || 'Failed to archive.', 'error');
+        if (trigger) trigger.disabled = false;
+      }
+    } catch {
+      toast('Network error.', 'error');
+      if (trigger) trigger.disabled = false;
+    }
+  }
+
+  async function unarchiveChannel(id) {
+    const card = document.getElementById('card-' + id);
+    const trigger = card ? card.querySelector('[data-action="unarchive"]') : null;
+    if (trigger) { trigger.disabled = true; }
+    try {
+      const r = await fetch('/channels/' + id + '/unarchive', { method: 'POST' });
+      const d = await r.json();
+      if (d.success) {
+        toast('✅ Channel restored');
+        setTimeout(() => location.reload(), 600);
+      } else {
+        toast(d.error || 'Failed to unarchive.', 'error');
+        if (trigger) trigger.disabled = false;
+      }
+    } catch {
+      toast('Network error.', 'error');
+      if (trigger) trigger.disabled = false;
+    }
+  }
+
+  // ── DELETE ────────────────────────────────────────────────
+  function openDeleteModal(id, name, tradeCount) {
+    _deleteId = id;
+    const msg = tradeCount > 0
+      ? 'This will permanently delete "' + name + '" and all ' + tradeCount + ' trade(s) inside it. This cannot be undone.'
+      : 'Permanently delete "' + name + '"? This cannot be undone.';
+    document.getElementById('delete-msg').textContent = msg;
+    openModal('deleteModal');
+  }
+  async function submitDelete() {
+    const btn = document.getElementById('delete-confirm-btn');
+    if (btn.disabled) return;
+    btn.disabled = true; btn.textContent = 'Deleting…';
+
+    const fd = new FormData();
+    fd.append('force', '1');
+    try {
+      const r = await fetch('/channels/' + _deleteId + '/delete', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (d.success) {
+        toast('🗑 Channel deleted');
+        closeModal('deleteModal');
+        const card = document.getElementById('card-' + _deleteId);
+        if (card) card.remove();
+      } else {
+        toast(d.error || 'Failed to delete.', 'error');
+      }
+    } finally {
+      btn.disabled = false; btn.textContent = 'Delete';
+    }
+  }
+
+  // ── ENTER KEY ─────────────────────────────────────────────
+  document.getElementById('create-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitCreate();
+  });
+  document.getElementById('rename-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitRename();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Results — Backtrack</title>
+  <style>
+    :root {
+      --primary:       #1e90ff;
+      --primary-dim:   rgba(30,144,255,.12);
+      --bg-dark:       #2c2c2c;
+      --bg-card:       #1e1e1e;
+      --bg-input:      #2a2a2a;
+      --bg-row:        rgba(255,255,255,.03);
+      --border:        #444;
+      --text:          #f0f0f0;
+      --text-muted:    #888;
+      --text-label:    #aaa;
+      --green:         #38a169;
+      --green-dim:     rgba(56,161,105,.15);
+      --green-hover:   #2f855a;
+      --red:           #e53e3e;
+      --red-dim:       rgba(229,62,62,.15);
+      --yellow:        #d69e2e;
+      --yellow-dim:    rgba(214,158,46,.15);
+      --blue-dim:      rgba(30,144,255,.12);
+      --shadow:        0 4px 20px rgba(0,0,0,.6);
+      --radius:        10px;
+      --radius-sm:     6px;
+      --transition:    .18s ease;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text);
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── NAV ──────────────────────────────────────────────────────────── */
+    nav {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 48px;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-brand {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--primary);
+      text-decoration: none;
+      margin-right: 10px;
+      letter-spacing: .3px;
+    }
+    .nav-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 5px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      transition: background var(--transition), color var(--transition);
+    }
+    .nav-link:hover       { background: rgba(255,255,255,.07); color: var(--text); }
+    .nav-link.nav-outline { border: 1px solid var(--primary); color: var(--primary); margin-left: 4px; }
+    .nav-link.nav-outline:hover { background: var(--primary-dim); }
+    .nav-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+
+    /* ── PAGE ─────────────────────────────────────────────────────────── */
+    .page {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      padding: 32px 20px 48px;
+    }
+    .results-wrap {
+      width: 100%;
+      max-width: 740px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ── OUTCOME CARD ─────────────────────────────────────────────────── */
+    .outcome-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    /* coloured top strip */
+    .outcome-header {
+      padding: 20px 28px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .outcome-header.tp  { background: var(--green-dim);  border-bottom-color: rgba(56,161,105,.25); }
+    .outcome-header.sl  { background: var(--red-dim);    border-bottom-color: rgba(229,62,62,.25); }
+    .outcome-header.be  { background: var(--yellow-dim); border-bottom-color: rgba(214,158,46,.25); }
+    .outcome-header.run { background: var(--blue-dim);   border-bottom-color: rgba(30,144,255,.2); }
+
+    .outcome-left { display: flex; flex-direction: column; gap: 4px; }
+    .outcome-symbol {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: .5px;
+      line-height: 1;
+    }
+    .outcome-meta {
+      font-size: 0.78rem;
+      color: var(--text-label);
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 2px;
+    }
+    .outcome-meta span { display: flex; align-items: center; gap: 4px; }
+
+    .outcome-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+    .outcome-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 5px 13px;
+      border-radius: 20px;
+    }
+    .outcome-badge.tp  { background: rgba(56,161,105,.25);  color: #68d391; border: 1px solid rgba(56,161,105,.4); }
+    .outcome-badge.sl  { background: rgba(229,62,62,.2);    color: #fc8181; border: 1px solid rgba(229,62,62,.35); }
+    .outcome-badge.be  { background: rgba(214,158,46,.2);   color: #f6e05e; border: 1px solid rgba(214,158,46,.35); }
+    .outcome-badge.run { background: rgba(30,144,255,.15);  color: #90cdf4; border: 1px solid rgba(30,144,255,.3); }
+
+    .outcome-pnl {
+      font-size: 1.8rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .outcome-pnl.tp  { color: #68d391; }
+    .outcome-pnl.sl  { color: #fc8181; }
+    .outcome-pnl.be  { color: #f6e05e; }
+    .outcome-pnl.run { color: #90cdf4; }
+
+    /* ── INFO GRID ────────────────────────────────────────────────────── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+    .info-cell {
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+    .info-cell:nth-child(even) { border-right: none; }
+    .info-cell:nth-last-child(-n+2) { border-bottom: none; }
+    /* If odd number of items, last spans full width */
+    .info-cell.full { grid-column: 1 / -1; border-right: none; }
+
+    .info-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .info-value {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text);
+      word-break: break-word;
+    }
+    .info-value.muted { color: var(--text-label); font-weight: 400; }
+    .info-value.price-sl { color: #fc8181; }
+    .info-value.price-tp { color: #68d391; }
+
+    /* ── TIMELINE ─────────────────────────────────────────────────────── */
+    .timeline-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .timeline-header {
+      padding: 12px 22px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+      color: var(--primary);
+      border-bottom: 1px solid var(--border);
+      background: rgba(30,144,255,.05);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .timeline-header::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(30,144,255,.15);
+    }
+
+    .timeline-list { padding: 0; margin: 0; }
+    .timeline-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 13px 22px;
+      border-bottom: 1px solid rgba(255,255,255,.04);
+    }
+    .timeline-row:last-child { border-bottom: none; }
+
+    .timeline-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-top: 5px;
+      flex-shrink: 0;
+    }
+    .dot-entry  { background: var(--primary); }
+    .dot-be     { background: var(--yellow); }
+    .dot-tp     { background: var(--green); }
+    .dot-sl     { background: var(--red); }
+    .dot-info   { background: #555; }
+    .dot-warn   { background: var(--yellow); }
+
+    .timeline-content { flex: 1; }
+    .timeline-event {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.4;
+    }
+    .timeline-detail {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* ── RAW FALLBACK (shown if parsing fails) ────────────────────────── */
+    .raw-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .raw-card-header {
+      padding: 12px 22px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .raw-list { padding: 8px 0; }
+    .raw-item {
+      padding: 10px 22px;
+      font-size: 0.88rem;
+      color: var(--text-label);
+      border-bottom: 1px solid rgba(255,255,255,.04);
+      font-family: 'Courier New', monospace;
+    }
+    .raw-item:last-child { border-bottom: none; }
+
+    /* ── ACTION ROW ───────────────────────────────────────────────────── */
+    .action-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 11px 22px;
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      text-align: center;
+      transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-back {
+      background: rgba(255,255,255,.07);
+      color: var(--text);
+      border: 1px solid var(--border);
+      flex: 1;
+      justify-content: center;
+    }
+    .btn-back:hover { background: rgba(255,255,255,.11); }
+    .btn-channels {
+      background: transparent;
+      color: var(--primary);
+      border: 1px solid var(--primary);
+      flex: 1;
+      justify-content: center;
+    }
+    .btn-channels:hover { background: var(--primary-dim); box-shadow: 0 4px 14px rgba(30,144,255,.2); }
+    .btn-save {
+      background: var(--green);
+      color: #fff;
+      flex: 1.4;
+      justify-content: center;
+    }
+    .btn-save:hover { background: var(--green-hover); box-shadow: 0 4px 14px rgba(56,161,105,.3); }
+
+    /* ── MODAL ────────────────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.78);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 460px;
+      padding: 28px;
+      box-shadow: var(--shadow);
+    }
+    .modal-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin: 0 0 20px;
+    }
+    .modal-field { margin-bottom: 14px; }
+    .modal-field:last-of-type { margin-bottom: 0; }
+    .modal-label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .modal-field select,
+    .modal-field input[type="text"],
+    .modal-field textarea {
+      width: 100%;
+      padding: 9px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color var(--transition);
+      box-sizing: border-box;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .modal-field select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'%3E%3Cpath fill='%23999' d='M6 7L0 0h12z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 10px;
+      padding-right: 32px;
+    }
+    .modal-field select:focus,
+    .modal-field input[type="text"]:focus,
+    .modal-field textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(30,144,255,.12); }
+    .modal-field textarea { resize: vertical; min-height: 64px; }
+
+    .new-ch-color-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+    .modal-field input[type="color"] {
+      width: 38px; height: 32px; padding: 2px;
+      border-radius: 5px; border: 1px solid var(--border);
+      background: var(--bg-input); cursor: pointer;
+    }
+    #new-channel-row { display: none; }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 22px;
+      justify-content: flex-end;
+    }
+    .btn-modal {
+      padding: 9px 20px;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: background var(--transition);
+    }
+    .btn-modal-cancel {
+      background: rgba(255,255,255,.07);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-modal-cancel:hover { background: rgba(255,255,255,.11); }
+    .btn-modal-save { background: var(--green); color: #fff; }
+    .btn-modal-save:hover { background: var(--green-hover); }
+    .btn-modal-save:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── TOAST ────────────────────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 28px;
+      right: 24px;
+      background: #2a2a2a;
+      color: var(--text);
+      padding: 12px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 0.88rem;
+      border-left: 4px solid var(--green);
+      display: none;
+      z-index: 200;
+      max-width: 380px;
+      box-shadow: var(--shadow);
+    }
+    #toast.error { border-color: var(--red); }
+
+    @media (max-width: 600px) {
+      .info-grid { grid-template-columns: 1fr; }
+      .info-cell { border-right: none; }
+      .info-cell:nth-last-child(-n+2) { border-bottom: 1px solid var(--border); }
+      .info-cell:last-child { border-bottom: none; }
+      .action-row { flex-direction: column; }
+      .outcome-header { flex-direction: column; align-items: flex-start; }
+      .outcome-right { align-items: flex-start; flex-direction: row; gap: 12px; align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── NAV ─────────────────────────────────────────────────────────── -->
+  <nav>
+    <a class="nav-brand" href="/">Backtrack</a>
+    <div class="nav-sep"></div>
+    <a class="nav-link" href="/">Monitor</a>
+    <a class="nav-link" href="/channels">Channels</a>
+    <a class="nav-link" href="/statistics">Statistics</a>
+    <div style="margin-left:auto;">
+      <a class="nav-link nav-outline" href="/channels">📂 Journal</a>
+    </div>
+  </nav>
+
+  <!-- ── PAGE ─────────────────────────────────────────────────────────── -->
+  <div class="page">
+    <div class="results-wrap" id="resultsWrap">
+      <!-- JS builds this from results array -->
+      <noscript>
+        <div class="raw-card">
+          <div class="raw-card-header">Trade Result</div>
+          <div class="raw-list">
+            {% for r in results %}
+              <div class="raw-item">{{ r }}</div>
+            {% endfor %}
+          </div>
+        </div>
+      </noscript>
+    </div>
+  </div>
+
+  <!-- ── SAVE MODAL ───────────────────────────────────────────────────── -->
+  <div class="modal-overlay" id="save-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal">
+      <p class="modal-title" id="modal-title">Save Trade to Channel</p>
+
+      <div class="modal-field">
+        <label class="modal-label" for="channel-select">Channel</label>
+        <select id="channel-select">
+          <option value="" disabled selected>Loading channels…</option>
+        </select>
+      </div>
+
+      <div id="new-channel-row">
+        <div class="modal-field">
+          <label class="modal-label" for="new-channel-name">New Channel Name *</label>
+          <input type="text" id="new-channel-name" placeholder="e.g. EURUSD London Session" maxlength="120" />
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="new-channel-desc">Description (optional)</label>
+          <textarea id="new-channel-desc" rows="2" maxlength="500" placeholder="What trades go here?"></textarea>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Card Colour</label>
+          <div class="new-ch-color-row">
+            <input type="color" id="new-channel-color" value="#4A90D9" />
+            <span style="font-size:0.8rem;color:var(--text-muted);">Accent colour on channel card</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-field" style="margin-top:14px;">
+        <label class="modal-label" for="trade-notes">Notes (optional)</label>
+        <textarea id="trade-notes" placeholder="Any observations about this trade…"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-modal btn-modal-cancel" id="cancel-save">Cancel</button>
+        <button class="btn-modal btn-modal-save"   id="confirm-save">Save Trade</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TRADE DATA (hidden, read by JS) ─────────────────────────────── -->
+  <div id="trade-data"
+       data-symbol="{{ save_context.symbol }}"
+       data-trade-type="{{ save_context.trade_type }}"
+       data-entry-time="{{ save_context.entry_time }}"
+       data-entry-price="{{ save_context.entry_price }}"
+       data-stoploss-price="{{ save_context.stoploss_price }}"
+       data-takeprofit-price="{{ save_context.takeprofit_price }}"
+       data-limit-price="{{ save_context.limit_price }}"
+       data-breakeven-active="{{ save_context.breakeven_active }}"
+       data-breakeven-type="{{ save_context.breakeven_type }}"
+       data-breakeven-value="{{ save_context.breakeven_value }}"
+       data-input-type="{{ save_context.input_type }}"
+       style="display:none;"></div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <!-- ── RESULTS DATA ─────────────────────────────────────────────────── -->
+  <script type="application/json" id="results-json">{{ results | tojson }}</script>
+
+  <script>
+  (function () {
+  // Read results from the JSON script tag instead of inline assignment
+  var RAW_RESULTS = JSON.parse(document.getElementById('results-json').textContent);
+
+    /* ═══════════════════════════════════════════════════════════════════
+       PARSER — extracts structured fields from the fixed-format strings
+       that trade_monitor.py returns. The strings are plain text; we do
+       NOT use innerHTML anywhere in this section.
+    ═══════════════════════════════════════════════════════════════════ */
+    function parseResults(lines) {
+      var out = {
+        symbol:         null,
+        tradeType:      null,
+        entryPrice:     null,
+        entryTime:      null,
+        slPrice:        null,
+        slPips:         null,
+        tpPrice:        null,
+        tpPips:         null,
+        // outcome: 'tp' | 'sl' | 'be' | 'running' | 'not_triggered' | 'force_closed' | null
+        outcome:        null,
+        outcomeTime:    null,
+        outcomeRuntime: null,
+        outcomePrice:   null,
+        pnl:            null,
+        pnlClass:       null,
+        beLevel:        null,
+        beTime:         null,
+        beRuntime:      null,
+        pendingRuntime: null,
+        pendingTime:    null,
+        pendingExpiry:  null,
+        forceCloseTime: null,
+        currentPrice:   null,
+        currentRuntime: null,
+        runningAsOf:    null,
+        raw:            lines,
+      };
+
+      lines.forEach(function(line) {
+        var s = line.trim();
+
+        if (s.startsWith('Pair:')) {
+          out.symbol = s.replace('Pair:', '').trim();
+        }
+        else if (s.startsWith('Trade Type:')) {
+          out.tradeType = s.replace('Trade Type:', '').trim();
+        }
+        else if (s.startsWith('Entry Price:')) {
+          // "Entry Price: 1.05432 | Time: 09:00 AM (15 March 2026)"
+          var parts = s.split('|');
+          out.entryPrice = parts[0].replace('Entry Price:', '').trim();
+          if (parts[1]) out.entryTime = parts[1].replace('Time:', '').trim();
+        }
+        else if (s.startsWith('SL Price:')) {
+          // "SL Price: 1.05200 (23.20 pips) | TP Price: 1.05800 (36.80 pips)"
+          var sltp = s.split('|');
+          var slPart = sltp[0].replace('SL Price:', '').trim();   // "1.05200 (23.20 pips)"
+          var tpPart = sltp[1] ? sltp[1].replace('TP Price:', '').trim() : '';
+          var slm = slPart.match(/^([\d.]+)\s*\(([\d.]+)\s*pips\)/);
+          if (slm) { out.slPrice = slm[1]; out.slPips = slm[2]; }
+          var tpm = tpPart.match(/^([\d.]+)\s*\(([\d.]+)\s*pips\)/);
+          if (tpm) { out.tpPrice = tpm[1]; out.tpPips = tpm[2]; }
+        }
+        else if (s.startsWith('Pending Order Triggered after:')) {
+          // "Pending Order Triggered after: 0D 2H 15M on 09:00 AM (15 March 2026) (Expiry: 1D 0H 0M)"
+          var pendingMatch = s.match(/Pending Order Triggered after:\s*(.+?)\s+on\s+(.+?)(?:\s+\(Expiry:\s*(.+?)\))?$/);
+          if (pendingMatch) {
+            out.pendingRuntime = pendingMatch[1];
+            out.pendingTime    = pendingMatch[2];
+            out.pendingExpiry  = pendingMatch[3] || null;
+          }
+        }
+        else if (s.startsWith('Pending Order Not Triggered')) {
+          out.outcome = 'not_triggered';
+          out.outcomeTime = s.replace(/^Pending Order Not Triggered by Close Trade Time\s*/, '').trim();
+        }
+        else if (s.startsWith('Breakeven Activated')) {
+          // "Breakeven Activated at 1R Level (1.05632) | Time: ... | Runtime: ..."
+          var beParts = s.split('|');
+          out.beLevel = beParts[0].replace('Breakeven Activated at', '').trim();
+          if (beParts[1]) out.beTime    = beParts[1].replace('Time:', '').trim();
+          if (beParts[2]) out.beRuntime = beParts[2].replace('Runtime:', '').trim();
+        }
+        else if (s.startsWith('Breakeven SL set at')) {
+          // ignore — already captured beLevel from "Breakeven Activated"
+        }
+        else if (s.startsWith('TP Hit:')) {
+          // "TP Hit: 1.05800 | Time: ... | Runtime: ..."
+          out.outcome = 'tp';
+          var tpHitParts = s.split('|');
+          out.outcomePrice   = tpHitParts[0].replace('TP Hit:', '').trim();
+          if (tpHitParts[1]) out.outcomeTime    = tpHitParts[1].replace('Time:', '').trim();
+          if (tpHitParts[2]) out.outcomeRuntime = tpHitParts[2].replace('Runtime:', '').trim();
+        }
+        else if (s.startsWith('SL Hit:')) {
+          out.outcome = 'sl';
+          var slHitParts = s.split('|');
+          out.outcomePrice   = slHitParts[0].replace('SL Hit:', '').trim();
+          if (slHitParts[1]) out.outcomeTime    = slHitParts[1].replace('Time:', '').trim();
+          if (slHitParts[2]) out.outcomeRuntime = slHitParts[2].replace('Runtime:', '').trim();
+        }
+        else if (s.startsWith('Breakeven Hit:')) {
+          out.outcome = 'be';
+          var beHitParts = s.split('|');
+          out.outcomePrice   = beHitParts[0].replace('Breakeven Hit:', '').trim();
+          if (beHitParts[1]) out.outcomeTime    = beHitParts[1].replace('Time:', '').trim();
+          if (beHitParts[2]) out.outcomeRuntime = beHitParts[2].replace('Runtime:', '').trim();
+        }
+        else if (s.startsWith('PnL:')) {
+          out.pnl = s.replace('PnL:', '').trim();
+          if      (out.pnl.startsWith('-'))       out.pnlClass = 'sl';
+          else if (out.pnl === '0R' || out.pnl === '0.0R') out.pnlClass = 'be';
+          else if (out.pnl === 'N/A')             out.pnlClass = 'run';
+          else                                    out.pnlClass = 'tp';
+        }
+        else if (s.startsWith('Trade still running as of')) {
+          out.outcome = 'running';
+          out.runningAsOf = s.replace('Trade still running as of', '').trim();
+        }
+        else if (s.startsWith('Current Price:')) {
+          // "Current Price: 1.05600 | Runtime: 0D 2H 30M | PnL: 23.40 pips, 1.01R"
+          // OR  "Current Price: 1.05600 | Runtime: 0D 2H 30M"
+          var cpParts = s.split('|');
+          out.currentPrice   = cpParts[0].replace('Current Price:', '').trim();
+          if (cpParts[1]) out.currentRuntime = cpParts[1].replace('Runtime:', '').trim();
+          // PnL is sometimes embedded here for force-close; capture it
+          if (cpParts[2] && !out.pnl) {
+            out.pnl = cpParts[2].replace('PnL:', '').trim();
+            out.pnlClass = 'run';
+          }
+        }
+        else if (s.startsWith('Trade evaluated at close time')) {
+          out.outcome = 'force_closed';
+          out.forceCloseTime = s.replace('Trade evaluated at close time', '').trim();
+        }
+      });
+
+      return out;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       RENDER — builds DOM nodes from parsed data. No innerHTML used on
+       user-supplied data; only textContent is used for dynamic values.
+    ═══════════════════════════════════════════════════════════════════ */
+    function outcomeLabel(outcome) {
+      return { tp: 'TP Hit', sl: 'SL Hit', be: 'Breakeven',
+               running: 'Still Running', not_triggered: 'Not Triggered',
+               force_closed: 'Force Closed' }[outcome] || 'Result';
+    }
+    function outcomeClass(outcome) {
+      return { tp: 'tp', sl: 'sl', be: 'be',
+               running: 'run', not_triggered: 'run', force_closed: 'run' }[outcome] || 'run';
+    }
+
+    /* Build a single info cell */
+    function infoCell(label, value, valueClass, fullWidth) {
+      var cell = document.createElement('div');
+      cell.className = 'info-cell' + (fullWidth ? ' full' : '');
+      var lbl = document.createElement('div');
+      lbl.className = 'info-label';
+      lbl.textContent = label;
+      var val = document.createElement('div');
+      val.className = 'info-value' + (valueClass ? ' ' + valueClass : '');
+      val.textContent = value || '—';
+      cell.appendChild(lbl);
+      cell.appendChild(val);
+      return cell;
+    }
+
+    /* Build a timeline row */
+    function timelineRow(dotClass, eventText, detailText) {
+      var row = document.createElement('div');
+      row.className = 'timeline-row';
+      var dot = document.createElement('div');
+      dot.className = 'timeline-dot ' + dotClass;
+      var content = document.createElement('div');
+      content.className = 'timeline-content';
+      var ev = document.createElement('div');
+      ev.className = 'timeline-event';
+      ev.textContent = eventText;
+      content.appendChild(ev);
+      if (detailText) {
+        var detail = document.createElement('div');
+        detail.className = 'timeline-detail';
+        detail.textContent = detailText;
+        content.appendChild(detail);
+      }
+      row.appendChild(dot);
+      row.appendChild(content);
+      return row;
+    }
+
+    function render(p) {
+      var wrap = document.getElementById('resultsWrap');
+      wrap.innerHTML = ''; // clear noscript fallback
+
+      var cls = outcomeClass(p.outcome);
+
+      /* ── OUTCOME CARD ──────────────────────────────────────── */
+      var card = document.createElement('div');
+      card.className = 'outcome-card';
+
+      /* header */
+      var hdr = document.createElement('div');
+      hdr.className = 'outcome-header ' + cls;
+
+      var left = document.createElement('div');
+      left.className = 'outcome-left';
+
+      var symEl = document.createElement('div');
+      symEl.className = 'outcome-symbol';
+      symEl.textContent = p.symbol || '—';
+
+      var metaEl = document.createElement('div');
+      metaEl.className = 'outcome-meta';
+
+      if (p.tradeType) {
+        var typeSpan = document.createElement('span');
+        typeSpan.textContent = '⬢ ' + p.tradeType;
+        metaEl.appendChild(typeSpan);
+      }
+      if (p.entryTime) {
+        var timeSpan = document.createElement('span');
+        timeSpan.textContent = '🕐 ' + p.entryTime;
+        metaEl.appendChild(timeSpan);
+      }
+
+      left.appendChild(symEl);
+      left.appendChild(metaEl);
+
+      var right = document.createElement('div');
+      right.className = 'outcome-right';
+
+      var badge = document.createElement('div');
+      badge.className = 'outcome-badge ' + cls;
+      badge.textContent = outcomeLabel(p.outcome);
+
+      var pnlEl = document.createElement('div');
+      pnlEl.className = 'outcome-pnl ' + (p.pnlClass || cls);
+      pnlEl.textContent = p.pnl || '—';
+
+      right.appendChild(badge);
+      right.appendChild(pnlEl);
+
+      hdr.appendChild(left);
+      hdr.appendChild(right);
+      card.appendChild(hdr);
+
+      /* info grid */
+      var grid = document.createElement('div');
+      grid.className = 'info-grid';
+
+      if (p.entryPrice) grid.appendChild(infoCell('Entry Price', p.entryPrice, null, false));
+      if (p.outcomeRuntime || p.currentRuntime) {
+        grid.appendChild(infoCell('Duration', p.outcomeRuntime || p.currentRuntime, null, false));
+      }
+      if (p.slPrice) grid.appendChild(infoCell('SL Price', p.slPrice + (p.slPips ? '  (' + p.slPips + ' pips)' : ''), 'price-sl', false));
+      if (p.tpPrice) grid.appendChild(infoCell('TP Price', p.tpPrice + (p.tpPips ? '  (' + p.tpPips + ' pips)' : ''), 'price-tp', false));
+
+      if (p.outcome === 'running' && p.currentPrice) {
+        grid.appendChild(infoCell('Current Price', p.currentPrice, null, false));
+        if (p.runningAsOf) grid.appendChild(infoCell('As Of', p.runningAsOf, 'muted', false));
+      }
+      if (p.outcome === 'force_closed' && p.currentPrice) {
+        grid.appendChild(infoCell('Close Price', p.currentPrice, null, false));
+        if (p.forceCloseTime) grid.appendChild(infoCell('Close Time', p.forceCloseTime, 'muted', false));
+      }
+      if (p.outcome === 'not_triggered') {
+        grid.appendChild(infoCell('Status', 'Order expired / closed before trigger', 'muted', true));
+      }
+
+      // If grid has odd number of cells, last cell needs no border-right fix via CSS already
+      // but if grid is totally empty, skip it
+      if (grid.children.length > 0) card.appendChild(grid);
+      wrap.appendChild(card);
+
+      /* ── TIMELINE CARD ─────────────────────────────────────── */
+      /* Only show if there's more than just entry to show */
+      var hasTimeline = (p.pendingRuntime || p.beLevel || p.outcomeTime || p.runningAsOf || p.forceCloseTime);
+      if (hasTimeline) {
+        var tcCard = document.createElement('div');
+        tcCard.className = 'timeline-card';
+
+        var tcHdr = document.createElement('div');
+        tcHdr.className = 'timeline-header';
+        tcHdr.textContent = 'Event Timeline';
+        tcCard.appendChild(tcHdr);
+
+        var tcList = document.createElement('div');
+        tcList.className = 'timeline-list';
+
+        /* 1. Entry */
+        var entryDetail = p.entryTime ? 'At ' + p.entryTime : null;
+        if (p.entryPrice) entryDetail = (entryDetail || '') + (entryDetail ? '  ·  ' : '') + 'Price ' + p.entryPrice;
+        tcList.appendChild(timelineRow('dot-entry', 'Order Placed', entryDetail));
+
+        /* 2. Pending order triggered */
+        if (p.pendingRuntime) {
+          var pendingDetail = 'Triggered at ' + (p.pendingTime || '—') +
+            (p.pendingExpiry ? '  ·  Expiry ' + p.pendingExpiry : '');
+          tcList.appendChild(timelineRow('dot-info', 'Pending Order Filled  (+' + p.pendingRuntime + ')', pendingDetail));
+        }
+
+        /* 3. Breakeven activation */
+        if (p.beLevel) {
+          var beDetail = p.beTime ? 'At ' + p.beTime + (p.beRuntime ? '  ·  +' + p.beRuntime : '') : null;
+          tcList.appendChild(timelineRow('dot-be', 'Breakeven Activated at ' + p.beLevel, beDetail));
+        }
+
+        /* 4. Final outcome event */
+        if (p.outcome === 'tp') {
+          var tpDetail = p.outcomePrice ? 'Price ' + p.outcomePrice + '  ·  ' + p.outcomeTime : p.outcomeTime;
+          tcList.appendChild(timelineRow('dot-tp', 'Take Profit Hit', tpDetail));
+        } else if (p.outcome === 'sl') {
+          var slDetail = p.outcomePrice ? 'Price ' + p.outcomePrice + '  ·  ' + p.outcomeTime : p.outcomeTime;
+          tcList.appendChild(timelineRow('dot-sl', 'Stop Loss Hit', slDetail));
+        } else if (p.outcome === 'be') {
+          var beOutDetail = p.outcomePrice ? 'Price ' + p.outcomePrice + '  ·  ' + p.outcomeTime : p.outcomeTime;
+          tcList.appendChild(timelineRow('dot-be', 'Breakeven Exit', beOutDetail));
+        } else if (p.outcome === 'running') {
+          tcList.appendChild(timelineRow('dot-info', 'Trade Still Running', 'No TP/SL/BE hit within available data'));
+        } else if (p.outcome === 'force_closed') {
+          tcList.appendChild(timelineRow('dot-warn', 'Force Closed at ' + (p.forceCloseTime || '—'), p.currentPrice ? 'Price ' + p.currentPrice : null));
+        } else if (p.outcome === 'not_triggered') {
+          tcList.appendChild(timelineRow('dot-warn', 'Order Not Triggered', 'Closed before price reached limit/stop'));
+        }
+
+        tcCard.appendChild(tcList);
+        wrap.appendChild(tcCard);
+      }
+
+      /* ── ACTION ROW ────────────────────────────────────────── */
+      var actions = document.createElement('div');
+      actions.className = 'action-row';
+
+      var backBtn = document.createElement('a');
+      backBtn.href = '/';
+      backBtn.className = 'btn btn-back';
+      backBtn.textContent = '← Back to Monitor';
+
+      var chBtn = document.createElement('a');
+      chBtn.href = '/channels';
+      chBtn.className = 'btn btn-channels';
+      chBtn.textContent = '📂 Channels';
+
+      var saveBtn = document.createElement('button');
+      saveBtn.id = 'open-save-modal';
+      saveBtn.className = 'btn btn-save';
+      saveBtn.textContent = '💾 Save Trade';
+
+      actions.appendChild(backBtn);
+      actions.appendChild(chBtn);
+      actions.appendChild(saveBtn);
+      wrap.appendChild(actions);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       FALLBACK RAW VIEW — shown when parsing yields nothing useful
+    ═══════════════════════════════════════════════════════════════════ */
+    function renderRaw(lines) {
+      var wrap = document.getElementById('resultsWrap');
+      wrap.innerHTML = '';
+
+      var rawCard = document.createElement('div');
+      rawCard.className = 'raw-card';
+      var rawHdr = document.createElement('div');
+      rawHdr.className = 'raw-card-header';
+      rawHdr.textContent = 'Trade Result';
+      rawCard.appendChild(rawHdr);
+
+      var rawList = document.createElement('div');
+      rawList.className = 'raw-list';
+      lines.forEach(function(line) {
+        var item = document.createElement('div');
+        item.className = 'raw-item';
+        item.textContent = line;
+        rawList.appendChild(item);
+      });
+      rawCard.appendChild(rawList);
+      wrap.appendChild(rawCard);
+
+      /* still add action buttons */
+      var actions = document.createElement('div');
+      actions.className = 'action-row';
+      var backBtn = document.createElement('a');
+      backBtn.href = '/'; backBtn.className = 'btn btn-back'; backBtn.textContent = '← Back to Monitor';
+      var saveBtn = document.createElement('button');
+      saveBtn.id = 'open-save-modal'; saveBtn.className = 'btn btn-save'; saveBtn.textContent = '💾 Save Trade';
+      actions.appendChild(backBtn);
+      actions.appendChild(saveBtn);
+      wrap.appendChild(actions);
+    }
+
+    /* ─── Bootstrap ─────────────────────────────────────────── */
+    var parsed = parseResults(RAW_RESULTS);
+    if (parsed.symbol || parsed.outcome) {
+      render(parsed);
+    } else {
+      renderRaw(RAW_RESULTS);
+    }
+
+    /* ─── After render: attach save modal listener dynamically ─ */
+    /* (element is created by render/renderRaw above) */
+    setTimeout(function() {
+      var openBtn = document.getElementById('open-save-modal');
+      if (openBtn) openBtn.addEventListener('click', function() {
+        loadChannels();
+        document.getElementById('save-modal').classList.add('active');
+      });
+    }, 0);
+
+    /* ═══════════════════════════════════════════════════════════════════
+       SAVE MODAL LOGIC — unchanged from original (XSS-safe DOM methods)
+    ═══════════════════════════════════════════════════════════════════ */
+    var modal         = document.getElementById('save-modal');
+    var cancelBtn     = document.getElementById('cancel-save');
+    var confirmBtn    = document.getElementById('confirm-save');
+    var channelSelect = document.getElementById('channel-select');
+    var newChRow      = document.getElementById('new-channel-row');
+    var newChInput    = document.getElementById('new-channel-name');
+    var newChDesc     = document.getElementById('new-channel-desc');
+    var newChColor    = document.getElementById('new-channel-color');
+    var notesArea     = document.getElementById('trade-notes');
+    var toastEl       = document.getElementById('toast');
+    var tradeData     = document.getElementById('trade-data');
+
+    async function loadChannels() {
+      channelSelect.innerHTML = '<option value="" disabled selected>Loading…</option>';
+      try {
+        var res  = await fetch('/channels/list_json');
+        var data = await res.json();
+        channelSelect.innerHTML = '<option value="" disabled selected>— select a channel —</option>';
+        data.forEach(function(ch) {
+          var opt = document.createElement('option');
+          opt.value = ch.channel_id;
+          opt.textContent = ch.name;
+          channelSelect.appendChild(opt);
+        });
+        var newOpt = document.createElement('option');
+        newOpt.value = 'new';
+        newOpt.textContent = '＋ Create new channel';
+        channelSelect.appendChild(newOpt);
+      } catch (e) {
+        showToast({ error: 'Could not load channels. Please try again.' });
+      }
+    }
+
+    cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', function(e) { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
+
+    function closeModal() {
+      modal.classList.remove('active');
+      newChRow.style.display = 'none';
+      newChInput.value  = '';
+      newChDesc.value   = '';
+      newChColor.value  = '#4A90D9';
+      notesArea.value   = '';
+      channelSelect.innerHTML = '<option value="" disabled selected>Loading channels…</option>';
+    }
+
+    channelSelect.addEventListener('change', function() {
+      newChRow.style.display = channelSelect.value === 'new' ? 'block' : 'none';
+    });
+
+    confirmBtn.addEventListener('click', async function() {
+      var channelId      = channelSelect.value;
+      var newChannelName = newChInput.value.trim();
+      if (!channelId) { showToast({ error: 'Please select or create a channel.' }); return; }
+      if (channelId === 'new' && !newChannelName) { showToast({ error: 'Please enter a name for the new channel.' }); return; }
+
+      confirmBtn.disabled    = true;
+      confirmBtn.textContent = 'Saving…';
+
+      var d    = tradeData.dataset;
+      var body = new FormData();
+      body.append('channel_id',              channelId);
+      body.append('new_channel_name',        newChannelName);
+      body.append('new_channel_description', newChDesc.value.trim());
+      body.append('new_channel_color',       newChColor.value);
+      body.append('symbol',           d.symbol);
+      body.append('trade_type',       d.tradeType);
+      body.append('entry_time',       d.entryTime);
+      body.append('entry_price',      d.entryPrice);
+      body.append('stoploss_price',   d.stoplossPrice);
+      body.append('takeprofit_price', d.takeprofitPrice);
+      body.append('limit_price',      d.limitPrice);
+      body.append('breakeven_active', d.breakevenActive);
+      body.append('breakeven_type',   d.breakevenType);
+      body.append('breakeven_value',  d.breakevenValue);
+      body.append('input_type',       d.inputType);
+      body.append('notes',            notesArea.value.trim());
+
+      try {
+        var res  = await fetch('/save_trade', { method: 'POST', body: body });
+        var data = await res.json();
+        if (data.success) {
+          closeModal();
+          showToast({ channelName: data.channel_name, pricePathCaptured: data.price_path_captured });
+        } else {
+          showToast({ error: data.error });
+        }
+      } catch (e) {
+        showToast({ error: 'Network error — trade not saved.' });
+      } finally {
+        confirmBtn.disabled    = false;
+        confirmBtn.textContent = 'Save Trade';
+      }
+    });
+
+    function showToast(opts) {
+      opts = opts || {};
+      while (toastEl.firstChild) toastEl.removeChild(toastEl.firstChild);
+      if (opts.error) {
+        toastEl.className = 'error';
+        toastEl.textContent = 'Error: ' + opts.error;
+      } else {
+        toastEl.className = '';
+        toastEl.appendChild(document.createTextNode('✅ Saved to '));
+        var strong = document.createElement('strong');
+        strong.textContent = opts.channelName;
+        toastEl.appendChild(strong);
+        if (!opts.pricePathCaptured) {
+          toastEl.appendChild(document.createTextNode(' ⚠️ price path could not be fully computed'));
+        }
+      }
+      toastEl.style.display = 'block';
+      setTimeout(function() { toastEl.style.display = 'none'; }, 5500);
+    }
+
+  }());
+  </script>
+
+</body>
+</html>
