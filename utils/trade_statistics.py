@@ -657,6 +657,259 @@ def compute_untp_stats(
     }
 
 # ═══════════════════════════════════════════════════════════════
+# PHASE 6 — WALK-BASED COMPUTE (parquet re-walk results)
+# ═══════════════════════════════════════════════════════════════
+# These functions receive walk results from walk_engine.walk_trade_untp()
+# instead of reading stored UNTP snapshot columns.
+# pairs = [(trade_dict, walk_result), ...] ordered by entry_time ASC
+# walk_result keys: peak_mfe_r, peak_mae_r, stop_reason, stopped_at_min, path
+
+def _compute_fixed_untp_group_from_walks(
+    pairs: list[tuple[dict, dict]],
+    tp_value: float,
+    unit: str,
+) -> dict:
+    """
+    Classify one group of (trade, walk_result) pairs for fixed_untp.
+    Win = peak_mfe_r >= rr_target. alive is irrelevant. (R11)
+    Returns same sub-shape as the group stats inside compute_fixed_untp_from_walks.
+    """
+    classified: list[tuple[dict, str, Optional[float]]] = []
+    mfe_vals:   list[float] = []
+    mae_vals:   list[float] = []
+    inconclusive_cnt = 0
+
+    for t, wr in pairs:
+        rr_target = _rr_target_for_trade(t, tp_value, unit)
+        if rr_target is None:
+            inconclusive_cnt += 1
+            classified.append((t, 'inconclusive', None))
+            continue
+
+        peak_mfe = wr['peak_mfe_r']
+        peak_mae = wr['peak_mae_r']
+        mfe_vals.append(peak_mfe)
+        mae_vals.append(peak_mae)
+
+        if peak_mfe >= rr_target:
+            classified.append((t, 'win', rr_target))
+        else:
+            classified.append((t, 'loss', -1.0))
+
+    wins      = sum(1 for (_, r, _) in classified if r == 'win')
+    losses    = sum(1 for (_, r, _) in classified if r == 'loss')
+    evaluated = wins + losses
+
+    win_pnls  = [pnl for (_, r, pnl) in classified if r == 'win']
+    loss_pnls = [pnl for (_, r, pnl) in classified if r == 'loss']
+    net_rr    = round(sum(win_pnls) + sum(loss_pnls), 4)
+
+    win_rate   = round(wins   / evaluated * 100.0, 1) if evaluated > 0 else 0.0
+    expectancy = round(net_rr / evaluated,          4) if evaluated > 0 else 0.0
+    avg_mfe_r  = round(sum(mfe_vals)  / len(mfe_vals),  3) if mfe_vals  else 0.0
+    avg_mae_r  = round(sum(mae_vals)  / len(mae_vals),  3) if mae_vals  else 0.0
+    avg_win_r  = round(sum(win_pnls)  / len(win_pnls),  3) if win_pnls  else 0.0
+    avg_loss_r = round(sum(loss_pnls) / len(loss_pnls), 3) if loss_pnls else 0.0
+
+    # Equity + drawdown — evaluated trades only, chronological
+    equity_curve: list[list] = []
+    running = 0.0
+    for (t, result, pnl) in classified:
+        if result == 'inconclusive':
+            continue
+        running += pnl  # type: ignore[operator]
+        equity_curve.append([_entry_label(t), round(running, 4)])
+
+    drawdown_curve: list[list] = []
+    peak = max_dd = 0.0
+    for label, cum in equity_curve:
+        if cum > peak:
+            peak = cum
+        dd = round(peak - cum, 4)
+        if dd > max_dd:
+            max_dd = dd
+        drawdown_curve.append([label, -dd])
+
+    # Streaks (inconclusive = skip)
+    max_win_streak = max_loss_streak = 0
+    cur_win = cur_loss = 0
+    for (_, result, _) in classified:
+        if result == 'win':
+            cur_win += 1; cur_loss = 0
+            max_win_streak = max(max_win_streak, cur_win)
+        elif result == 'loss':
+            cur_loss += 1; cur_win = 0
+            max_loss_streak = max(max_loss_streak, cur_loss)
+
+    return {
+        'evaluated_count':    evaluated,
+        'wins':               wins,
+        'losses':             losses,
+        'inconclusive_count': inconclusive_cnt,
+        'win_rate':           win_rate,
+        'net_rr':             net_rr,
+        'expectancy':         expectancy,
+        'avg_mfe_r':          avg_mfe_r,
+        'avg_mae_r':          avg_mae_r,
+        'avg_win_r':          avg_win_r,
+        'avg_loss_r':         avg_loss_r,
+        'max_drawdown':       round(max_dd, 3),
+        'max_win_streak':     max_win_streak,
+        'max_loss_streak':    max_loss_streak,
+        'equity_curve':       equity_curve,
+        'drawdown_curve':     drawdown_curve,
+        'sample_warning':     evaluated < 20,
+    }
+
+
+def compute_fixed_untp_from_walks(
+    pairs_be_on: list[tuple[dict, dict]],
+    pairs_be_off: list[tuple[dict, dict]],
+    tp_value: float,
+    unit: str,
+    total_trades: int,
+    excluded_count: int,
+    walk_excluded_count: int,
+    time_limit_label: str = 'No limit',
+) -> dict:
+    """
+    Module 1 fixed_untp — Phase 6 walk-based version.
+    Returns stats_be_on + stats_be_off instead of old three-group structure.
+    result_type='overview_walk' — frontend renderOverviewWalk() handles it.
+    """
+    return {
+        'result_type':          'overview_walk',
+        'tp_mode':              'fixed_untp',
+        'tp_value':             tp_value,
+        'unit':                 unit,
+        'time_limit_label':     time_limit_label,
+        'total_trades':         total_trades,
+        'excluded_count':       excluded_count,
+        'walk_excluded_count':  walk_excluded_count,
+        'stats_be_on':  _compute_fixed_untp_group_from_walks(pairs_be_on,  tp_value, unit),
+        'stats_be_off': _compute_fixed_untp_group_from_walks(pairs_be_off, tp_value, unit),
+    }
+
+
+def _compute_untp_group_from_walks(
+    pairs: list[tuple[dict, dict]],
+) -> dict:
+    """
+    Compute UNTP overview buckets for one group from walk results.
+    stop_reason → Open / SL / BE bucket (R6 streak rules: BE = skip).
+    Returns same shape as _compute_untp_group().
+    """
+    open_pairs: list[tuple[dict, dict]] = []
+    sl_pairs:   list[tuple[dict, dict]] = []
+    be_pairs:   list[tuple[dict, dict]] = []
+
+    for t, wr in pairs:
+        sr = wr['stop_reason']
+        if sr in ('time_limit', 'open'):
+            open_pairs.append((t, wr))
+        elif sr == 'be':
+            be_pairs.append((t, wr))
+        else:  # 'sl'
+            sl_pairs.append((t, wr))
+
+    open_count = len(open_pairs)
+    sl_count   = len(sl_pairs)
+    be_count   = len(be_pairs)
+    evaluated  = open_count + sl_count + be_count
+
+    open_rate = round(open_count / evaluated * 100.0, 1) if evaluated > 0 else 0.0
+
+    # Equity curve — Open→peak_mfe_r (floating), SL→-1.0, BE→0.0
+    equity_curve: list[list] = []
+    running = 0.0
+    for t, wr in pairs:
+        sr = wr['stop_reason']
+        if sr in ('time_limit', 'open'):
+            pnl = wr['peak_mfe_r']
+        elif sr == 'be':
+            pnl = 0.0
+        else:
+            pnl = -1.0
+        running += pnl
+        equity_curve.append([_entry_label(t), round(running, 4)])
+
+    net_r      = round(running, 4)
+    expectancy = round(net_r / evaluated, 4) if evaluated > 0 else 0.0
+
+    # Drawdown
+    drawdown_curve: list[list] = []
+    peak = max_dd = 0.0
+    for label, cum in equity_curve:
+        if cum > peak:
+            peak = cum
+        dd = round(peak - cum, 4)
+        if dd > max_dd:
+            max_dd = dd
+        drawdown_curve.append([label, -dd])
+
+    # Avg MFE / MAE for Open trades only
+    open_mfe_vals = [wr['peak_mfe_r'] for _, wr in open_pairs]
+    open_mae_vals = [wr['peak_mae_r'] for _, wr in open_pairs]
+    avg_open_mfe_r = round(sum(open_mfe_vals) / len(open_mfe_vals), 3) if open_mfe_vals else 0.0
+    avg_open_mae_r = round(sum(open_mae_vals) / len(open_mae_vals), 3) if open_mae_vals else 0.0
+
+    # Streaks — BE = skip (R6)
+    max_open_streak = max_sl_streak = 0
+    cur_open = cur_sl = 0
+    for t, wr in pairs:
+        sr = wr['stop_reason']
+        if sr in ('time_limit', 'open'):
+            cur_open += 1; cur_sl = 0
+            max_open_streak = max(max_open_streak, cur_open)
+        elif sr == 'sl':
+            cur_sl += 1; cur_open = 0
+            max_sl_streak = max(max_sl_streak, cur_sl)
+        # be: skip — neither counter touched
+
+    return {
+        'total':            evaluated,
+        'open_count':       open_count,
+        'sl_count':         sl_count,
+        'be_count':         be_count,
+        'open_rate':        open_rate,
+        'net_r':            net_r,
+        'expectancy':       expectancy,
+        'avg_open_mfe_r':   avg_open_mfe_r,
+        'avg_open_mae_r':   avg_open_mae_r,
+        'max_drawdown':     round(max_dd, 3),
+        'max_open_streak':  max_open_streak,
+        'max_sl_streak':    max_sl_streak,
+        'equity_curve':     equity_curve,
+        'drawdown_curve':   drawdown_curve,
+        'sample_warning':   evaluated < 20,
+    }
+
+
+def compute_untp_stats_from_walks(
+    pairs_be_on: list[tuple[dict, dict]],
+    pairs_be_off: list[tuple[dict, dict]],
+    total_trades: int,
+    excluded_count: int,
+    walk_excluded_count: int,
+    time_limit_label: str = 'No limit',
+) -> dict:
+    """
+    Module 1 untp_overview — Phase 6 walk-based version.
+    Returns stats_be_on + stats_be_off.
+    result_type='untp_stats_walk' — frontend renderUntpStatsWalk() handles it.
+    """
+    return {
+        'result_type':          'untp_stats_walk',
+        'tp_mode':              'untp_overview',
+        'time_limit_label':     time_limit_label,
+        'total_trades':         total_trades,
+        'excluded_count':       excluded_count,
+        'walk_excluded_count':  walk_excluded_count,
+        'stats_be_on':  _compute_untp_group_from_walks(pairs_be_on),
+        'stats_be_off': _compute_untp_group_from_walks(pairs_be_off),
+    }
+    
+# ═══════════════════════════════════════════════════════════════
 # MODULE 7 — PNL REPORT
 # ═══════════════════════════════════════════════════════════════
 
